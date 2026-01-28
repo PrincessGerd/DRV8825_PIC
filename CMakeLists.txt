@@ -1,13 +1,15 @@
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.3)
 set(CMAKE_TOOLCHAIN_FILE external/cmake-microchip/toolchain.cmake)
 set(MICROCHIP_MCU PIC18F16Q20)
 
 set(CMAKE_PROJECT_NAME stepper)
 project(${CMAKE_PROJECT_NAME} C)
 
-set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -Wpedantic")
 set(CMAKE_C_FLAGS_DEBUG "-g")
 set(CMAKE_C_FLAGS_RELEASE "-O3")
+set(CMAKE_C_COMPILER_FORCED TRUE)
+
+set(CMAKE_TRY_COMPILE_TARGET_TYPE STATIC_LIBRARY)
 
 include_directories(${CMAKE_PROJECT_NAME} PRIVATE
     "C:/Program Files/Microchip/xc8/v3.10/pic/include",
