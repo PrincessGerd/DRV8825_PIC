@@ -33,7 +33,7 @@ inline void timer_disable_impl(void* self) {
 
 inline void timer_set_period_impl(void* self,uint8_t count){
     timer_regs_t* regs = &((timer_instance_t*)self)->regs; 
-    if(*regs->CON & (1 << TMR_CON_ON_SHIFT)){
+    if((*regs->CON & TMR_CON_ON_MASK ) == 0){
         *regs->PR = count;
     }
 }

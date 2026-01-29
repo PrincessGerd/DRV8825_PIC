@@ -185,3 +185,80 @@
 #define TU16_ERS_SHIFT            0
 #define TU16_ERS_MASK            FIELD(6, TU16_ERS_SHIFT)
 #endif // REGISTERS_H
+
+/*---------------------------------------------------------------------------------------*/
+/*TMR0-----------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------*/
+
+#define TMR0_BASE_ADDRESS 0x103
+#define TMR0_TMRL_OFFSET 0x0
+#define TMR0_TMRH_OFFSET 0x1
+#define TMR0_CON0_OFFSET 0x2
+#define TMR0_CON1_OFFSET 0x3
+
+// TMR0CON0
+#define TMR0_CON0_EN_SHIFT      7
+#define TMR0_CON0_OUT_SHIFT     5
+#define TMR0_CON0_MD16_SHIFT    4
+#define TMR0_CON0_OUTPS_SHIFT   0
+
+#define TMR0_CON0_EN_MASK       BIT(TMR0_CON0_EN_SHIFT)
+#define TMR0_CON0_OUT_MASK      BIT(TMR0_CON0_OUT_SHIFT)
+#define TMR0_CON0_MD16_MASK     BIT(TMR0_CON0_MD16_SHIFT)
+#define TMR0_CON0_OUTPS_MASK    FIELD(4,TMR0_CON0_OUTPS_SHIFT)
+
+// TMRCON1
+#define TMR0_CON1_CS_SHIFT      5
+#define TMR0_CON1_ASYNC_SHIFT   4
+#define TMR0_CON1_CKPS_SHIFT    0
+
+#define TMR0_CON1_CS_MASK       FIELD(3,TMR0_CON1_CS_SHIFT)
+#define TMR0_CON1_ASYNC_MASK    BIT(TMR0_CON1_ASYNC_SHIFT)
+#define TMR0_CON1_CKSPS_MASK    FIELD(4,TMR0_CON1_CKPS_SHIFT)
+
+/*---------------------------------------------------------------------------------------*/
+/*TIMER1---------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------*/
+
+#define TMR1_BASE_ADDRESS      0x0107
+#define TMR1_TMRL_OFFSET       0x0
+#define TMR1_TMRH_OFFSET       0x1
+#define TMR1_CON_OFFSET        0x2
+#define TMR1_GCON_OFFSET       0x3
+#define TMR1_GATE_OFFSET       0x4
+#define TMR1_CLK_OFFSET        0x5
+
+// TMR1CON
+#define TMR1_CON_CKPS_SHIFT    5
+#define TMR1_CON_SYNC_SHIFT    4
+#define TMR1_CON_RD16_SHIFT    2
+#define TMR1_CON_ON_SHIFT      0
+
+#define TMR1_CON_CKPS_MASK     FIELD(2, TMR1_CON_CKPS_SHIFT)
+#define TMR1_CON_SYNC_MASK     BIT(TMR1_CON_SYNC_SHIFT)
+#define TMR1_CON_RD16_MASK     BIT(TMR1_CON_RD16_SHIFT)
+#define TMR1_CON_ON_MASK       BIT(TMR1_CON_ON_SHIFT)
+
+// TMR1GCON
+
+#define TMR1_GCON_GE_SHIFT        7
+#define TMR1_GCON_GPOL_SHIFT      6
+#define TMR1_GCON_GTM_SHIFT       5
+#define TMR1_GCON_GSPM_SHIFT      4
+#define TMR1_GCON_GGO_SHIFT       3
+#define TMR1_GCON_GVAL_SHIFT      2
+
+#define TMR1_GCON_GE_MASK         BIT(TMR1_GCON_GE_SHIFT)
+#define TMR1_GCON_GPOL_MASK       BIT(TMR1_GCON_GPOL_SHIFT)
+#define TMR1_GCON_GTM_MASK        BIT(TMR1_GCON_GTM_SHIFT)
+#define TMR1_GCON_GSPM_MASK       BIT(TMR1_GCON_GSPM_SHIFT)
+#define TMR1_GCON_GGO_MASK        BIT(TMR1_GCON_GGO_SHIFT)
+#define TMR1_GCON_GVAL_MASK       BIT(TMR1_GCON_GVAL_SHIFT)
+
+// TMRGSS
+#define TMR1_GATE_GSS_SHIFT     0
+#define TMR1_GATE_GSS_MASK      FIELD(4, TMR1_GATE_GSS_SHIFT)
+
+//  TMR1CLK
+#define TMR1_CLK_CS_SHIFT       0
+#define TMR1_CLK_CS_MASK        FIELD(4, TMR1_CLK_CS_SHIFT)
