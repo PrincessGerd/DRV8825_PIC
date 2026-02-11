@@ -19,6 +19,35 @@
 
     //TODO: update the old definitons to the new form. looks like shit tbh
 /*---------------------------------------------------------------------------------------*/
+/*PIE and PIR ---------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------*/
+#define PIE1_ADDRESS 0x474
+#define PIE2_ADDRESS 0x475
+#define PIE3_ADDRESS 0x476
+#define PIE4_ADDRESS 0x477
+
+#define PIE4_TMR2IE_SHIFT 0x0
+#define PIE4_TMR2IE_MASK BIT(PIE4_TMR2IE_SHIFT)
+#define PIE4_TMR4IE_SHIFT 0x1
+#define PIE4_TMR4IE_MASK BIT(PIE4_TMR4IE_SHIFT)
+
+#define PIE3_TMR0IE_SHIFT 0x5
+#define PIE3_TMR0IE_MASK BIT(PIE3_TMR0IE_SHIFT)
+//------------------------------------------------
+
+#define PIR1_ADDRESS 0x46A
+#define PIR2_ADDRESS 0x46B
+#define PIR3_ADDRESS 0x46C
+#define PIR4_ADDRESS 0x46D
+
+#define PIR4_TMR2IF_SHIFT 0x0
+#define PIR4_TMR4IF_MASK BIT(PIR4_TMR4IF_SHIFT)
+#define PIR4_TMR4IF_SHIFT 0x1
+#define PIR4_TMR2IF_MASK BIT(PIR4_TMR2IF_SHIFT)
+
+#define PIR3_TMR0IF_SHIFT 0x5
+#define PIR3_TMR0IF_MASK BIT(PIR3_TMR0IF_SHIFT)
+/*---------------------------------------------------------------------------------------*/
 /*TIMER2 and TIMER4----------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------*/
 #define TMR_BASE_ADDRESS 0x0119
@@ -184,7 +213,6 @@
 // TUxyERS External Reset Selector
 #define TU16_ERS_SHIFT            0
 #define TU16_ERS_MASK            FIELD(6, TU16_ERS_SHIFT)
-#endif // REGISTERS_H
 
 /*---------------------------------------------------------------------------------------*/
 /*TMR0-----------------------------------------------------------------------------------*/
@@ -262,3 +290,88 @@
 //  TMR1CLK
 #define TMR1_CLK_CS_SHIFT       0
 #define TMR1_CLK_CS_MASK        FIELD(4, TMR1_CLK_CS_SHIFT)
+
+/*---------------------------------------------------------------------------------------*/
+/*CLCx---------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------*/
+#define CLC_BASE_ADDRESS          0x01A3
+#define CLC_OFFSET_NEXT_MODULE    0x0C
+#define CLC_NUM_MODULES           0x4
+
+#define CLC_DATA_OFFSET           0x0
+#define CLC_SELECT_OFFSET         0x1
+#define CLC_CON_OFFSET            0x2
+#define CLC_POL_OFFSET            0x3
+#define CLC_SEL0_OFFSET           0x4
+#define CLC_SEL1_OFFSET           0x5
+#define CLC_SEL2_OFFSET           0x6
+#define CLC_SEL3_OFFSET           0x7
+#define CLC_GLS0_OFFSET           0x8
+#define CLC_GLS1_OFFSET           0x9
+#define CLC_GLS2_OFFSET           0xA
+#define CLC_GLS3_OFFSET           0xB
+
+// CLCxDATA
+#define CLC_DATA_OUT0_SHIFT       0
+#define CLC_DATA_OUT1_SHIFT       1
+#define CLC_DATA_OUT2_SHIFT       2
+#define CLC_DATA_OUT3_SHIFT       3
+
+#define CLC_DATA_OUT0_MASK        BIT(CLC_DATA_OUT0_SHIFT)
+#define CLC_DATA_OUT1_MASK        BIT(CLC_DATA_OUT1_SHIFT)
+#define CLC_DATA_OUT2_MASK        BIT(CLC_DATA_OUT2_SHIFT)
+#define CLC_DATA_OUT3_MASK        BIT(CLC_DATA_OUT3_SHIFT)
+
+//CLCxSELECT
+#define CLC_SELECT_SLCT_SHIFT     0
+#define CLC_SELECT_SLCT_MASK      FIELD(3, CLC_SELECT_SLCT_SHIFT)
+
+//CLCxCON
+#define CLC_CON_MODE_SHIFT        0
+#define CLC_CON_INTN_SHIFT        3
+#define CLC_CON_INTP_SHIFT        4
+#define CLC_CON_OUT_SHIFT         6
+#define CLC_CON_EN_SHIFT          7
+
+#define CLC_CON_MODE_MASK         FIELD(3, CLC_CON_MODE_SHIFT)
+#define CLC_CON_INTN_MASK         BIT(CLC_CON_INTN_SHIFT)
+#define CLC_CON_INTP_MASK         BIT(CLC_CON_INTP_SHIFT)
+#define CLC_CON_OUT_MASK          BIT(CLC_CON_OUT_SHIFT)
+#define CLC_CON_EN_MASK           BIT(CLC_CON_EN_SHIFT)
+
+// CLCxPOL
+#define CLC_POL_G1POL_SHIFT       0
+#define CLC_POL_G2POL_SHIFT       1
+#define CLC_POL_G3POL_SHIFT       2
+#define CLC_POL_G4POL_SHIFT       3
+#define CLC_POL_POL_SHIFT         7
+
+#define CLC_POL_G1POL_MASK        BIT(CLC_POL_G1POL_SHIFT)
+#define CLC_POL_G2POL_MASK        BIT(CLC_POL_G2POL_SHIFT)
+#define CLC_POL_G3POL_MASK        BIT(CLC_POL_G3POL_SHIFT)
+#define CLC_POL_G4POL_MASK        BIT(CLC_POL_G4POL_SHIFT)
+#define CLC_POL_POL_MASK          BIT(CLC_POL_POL_SHIFT)
+
+//CLCxSEL
+#define CLC_SEL_D_SHIFT           0
+#define CLC_SEL_D_MASK            FIELD(6, CLC_SEL_D_SHIFT)
+
+//CLCxGLS
+#define CLC_GLS_G1D1N_SHIFT       0
+#define CLC_GLS_G1D1T_SHIFT       1
+#define CLC_GLS_G1D2N_SHIFT       2
+#define CLC_GLS_G1D2T_SHIFT       3
+#define CLC_GLS_G1D3N_SHIFT       4
+#define CLC_GLS_G1D3T_SHIFT       5
+#define CLC_GLS_G1D4N_SHIFT       6
+#define CLC_GLS_G1D4T_SHIFT       7
+
+#define CLC_GLS_G1D1N_MASK        BIT(CLC_GLS_G1D1N_SHIFT)
+#define CLC_GLS_G1D1T_MASK        BIT(CLC_GLS_G1D1T_SHIFT)
+#define CLC_GLS_G1D2N_MASK        BIT(CLC_GLS_G1D2N_SHIFT)
+#define CLC_GLS_G1D2T_MASK        BIT(CLC_GLS_G1D2T_SHIFT)
+#define CLC_GLS_G1D3N_MASK        BIT(CLC_GLS_G1D3N_SHIFT)
+#define CLC_GLS_G1D3T_MASK        BIT(CLC_GLS_G1D3T_SHIFT)
+#define CLC_GLS_G1D4N_MASK        BIT(CLC_GLS_G1D4N_SHIFT)
+#define CLC_GLS_G1D4T_MASK        BIT(CLC_GLS_G1D4T_SHIFT)
+#endif // REGISTERS_H
