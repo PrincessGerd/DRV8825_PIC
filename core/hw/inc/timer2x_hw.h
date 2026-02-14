@@ -2,7 +2,6 @@
 #define TIMER2_HW_H
 #include <stdint.h>
 #include <stdbool.h>
-#include "../../../registers.h"
 
 typedef enum {
     TMR2_MODE_FREE_RUNNING = 0b00,

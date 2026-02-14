@@ -34,12 +34,10 @@ typedef struct {
 }gpio_config;
 
 typedef enum {
-    IO_0, IO_1,  IO_2,  IO_3,  IO_4,  IO_5,  IO_6,  IO_7, // PORTA
-    IO_8, IO_9, IO_10, IO_11, IO_12, IO_13, IO_14, IO_15, // PORTB
-    IO_16,IO_17,IO_18, IO_19, IO_20, IO_21, IO_22, IO_23, // PORTC
-    IO_24,IO_25,IO_26, IO_27, IO_28, IO_29, IO_30, IO_31, // PORTD
-    IO_32,IO_33,IO_34, IO_35, IO_36, IO_37, IO_38, IO_39, // PORTE
-    IO_40,IO_41,IO_42, IO_43, IO_44, IO_45, IO_46, IO_47, // PORTF
+    RA_0, RA_1,  RA_2,  RA_3,  RA_4,  RA_5,  RA_6,  RA_7, // PORTA
+    RB_0, RB_1,  RB_2,  RB_3,  RB_4,  RB_5,  RB_6,  RB_7, // PORTB
+    RC_0, RC_1,  RC_2,  RC_3,  RC_4,  RC_5,  RC_6,  RC_7, // PORTC
+    RD_0, RD_1,  RD_2,  RD_3,  RD_4,  RD_5,  RD_6,  RD_7, // PORTD
 } gpio_pin;
 
 // left as a interface since it might be used as a interface for a gpio expander

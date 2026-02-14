@@ -1,7 +1,6 @@
 #ifndef TIMER0_H
 #define TIMER0_H
 
-#include "../../../registers.h"
 #include <stdint.h>
 #include <stdbool.h>
 

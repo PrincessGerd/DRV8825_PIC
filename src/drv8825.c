@@ -1,20 +1,18 @@
 #include "stepper.h"
 // hardware
-#include "core/hw/inc/timer0_hw.h"
-#include "core/hw/inc/timer2x_hw.h"
-#include "core/hw/inc/clcx_hw.h"
+#include "../core/hw/inc/timer0_hw.h"
+#include "../core/hw/inc/timer2x_hw.h"
+#include "../core/hw/inc/clcx_hw.h"
 // core
-#include "core/irq_device.h"
-#include "core/irq_manager.h"
-#include "core/types.h"
-#include "core/pinmux.h"
-#include "core/gpio.h"
+#include "../core/irq_device.h"
+#include "../core/irq_manager.h"
+#include "../core/types.h"
+#include "../core/pinmux.h"
+#include "../core/gpio.h"
 // utils
-#include "fixed_point.h"
+#include "../inc/fixed_point.h"
 //system
 #include <xc.h>
-#include "mcc_generated_files/system/clock.h"
-
 #define STEPPER_OSC_FREQUENCY 250000    // 500khz
 // simple delay function
 // using the avrage clock cycles per instruction of 4 as base
@@ -186,10 +184,10 @@ static void drv8825_set_microsteps(stepper_device_t  dev, uint8_t ms){
 // blocking single step
 static void drv8825_single_step(stepper_device_t  dev){
     const struct drv8825* self = container_of(dev, struct drv8825, dev);
-    __delay_us(DRV8825_WAKEUP_TIME_US);
+    delay_us(DRV8825_WAKEUP_TIME_US);
     //delay_us(self->wakeup_time_us);
     gpio_set(self->gpio, self->step_pin);
-    __delay_us(DRV8825_PULSE_DURATION_US);
+    delay_us(DRV8825_PULSE_DURATION_US);
     gpio_clear(self->gpio, self->step_pin);
     //delay_us(self->pulse_duration_us);
 }
@@ -239,11 +237,14 @@ static void drv8825_init(stepper_device_t dev, stepper_pin_config_t* pin_cfg){
     gpio_set_mode(self->gpio,self->mode2_pin,IO_MODE_DIGITAL);
     gpio_set_direction(self->gpio,self->dir_pin,IO_DIR_OUTPUT);
     gpio_set_direction(self->gpio,self->step_pin,IO_DIR_INPUT);
-    gpio_set_direction(self->gpio,self->enable_pin,IO_DIR_INPUT);
+    gpio_set_direction(self->gpio,self->enable_pin,IO_DIR_OUTPUT);
     gpio_set_direction(self->gpio,self->mode0_pin,IO_DIR_OUTPUT);
     gpio_set_direction(self->gpio,self->mode1_pin,IO_DIR_OUTPUT);
     gpio_set_direction(self->gpio,self->mode2_pin,IO_DIR_OUTPUT);
     pinmux_set_output(self->mux, self->step_pin, 0x0F);
+    pinmux_set_output(self->mux, self->mode0_pin, 0x0);
+    pinmux_set_output(self->mux, self->mode1_pin, 0x0);
+    pinmux_set_output(self->mux, self->mode2_pin, 0x0);
     timer2x_init(self->period_counter, &period_counter_config);
     timer0_init(self->step_counter, &step_counter_config);
     clcx_hw_init(self->clc_latch, &logic_config);

@@ -46,7 +46,7 @@ void gpio_instance(gpio_t* inst_out){
 void _gpio_write_pin(gpio_t dev, uint8_t io_pin, bool value) {
     (void)dev;
     const uint8_t port = io_port(io_pin);
-    const uint8_t pin = io_pin_bit(pin);
+    const uint8_t pin = io_pin_bit(io_pin);
     if(value){
         *io_latch_register[port] |= pin;
     }else{

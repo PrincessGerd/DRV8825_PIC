@@ -1,4 +1,5 @@
 #include "../inc/timer2x_hw.h"
+#include "../registers.h"
 #include <stdint.h>
 
 typedef struct timer2x_hw{
