@@ -1,0 +1,164 @@
+
+#include "../core/task_manager.h"
+#include "../core/gpio.h"
+#include "../core/hw/inc/timer0_hw.h"
+#include "../core/hw/inc/timer2x_hw.h"
+#include "../core/hw/inc/clcx_hw.h"
+#include "../core/types.h"
+#include "stepper.h"
+
+#define clamp(val, max) ((val > max) ? max : val)
+
+
+typedef enum {
+    EVENT_START,
+    EVENT_STOP,
+    EVENT_STEP,
+    EVENT_IDLE,
+    EVENT_FAULT
+} stepper_signals_e;
+
+typedef union{
+    struct{
+        uint32_t  steps;
+        uint32_t  speed;
+        uint32_t  accel;
+    };
+    uint8_t _raw[12];
+} stepper_params_t;
+
+typedef enum stepper_states{
+    STEPPER_STATE_ACCELERATE,
+    STEPPER_STATE_CONSTANT_SPEED,
+    STEPPER_STATE_DEACCELERATE
+}motion_states_e;
+
+typedef struct {
+    uint8_t     dir_pin;
+    uint8_t     step_pin;
+    uint8_t     enable_pin;
+    uint8_t     mode0_pin;
+    uint8_t     mode1_pin;
+    uint8_t     mode2_pin;
+} pin_config_t;
+
+
+typedef struct{
+    task_t super;
+    timed_event_t te;
+    struct timer2x_hw* period_counter;
+    motion_states_e motion_state;
+    uint32_t tick_freq;         // frequency of timer 
+
+    uint32_t phase_acc;         // phase accumulator
+    uint32_t phase_inc;         // phase increment
+
+    uint32_t step_rate;         // current speed (steps/sec)
+    uint32_t target_rate;       // desired speed (steps/sec)
+    uint32_t accel_per_step;    // acceleration increase per step
+
+    uint32_t decel_steps;       // steps required to decelarate
+    uint32_t steps_remaining;   // steps to done
+    uint8_t dir_state;          // current direction
+    pin_config_t pins;          // 
+} stepper_t;
+
+void set_microstep(stepper_t* self, uint8_t ms){
+    ms = ms > 0x7 ? 0x7 : ms;
+    gpio_write(self->mode0_pin, ((ms & (1 << 0))));
+    gpio_write(self->mode1_pin, ((ms & (1 << 1))));
+    gpio_write(self->mode2_pin, ((ms & (1 << 2))));
+}
+
+static void stepper_create(stepper_t* self){
+
+}
+
+void stepper_dispatch(stepper_t* self, const tm_event_t* event){
+    switch (event->signal) {
+    ////////////////////////////////////////////////////////
+    case EVENT_START:{
+        stepper_workEvt_t* evt = 
+            container_of(event, struct stepper_workEvt, super);
+        self->steps_remaining = evt->steps;
+        self->target_rate = evt->speed;
+        self->step_rate   = 0;
+
+        uint32_t accel_steps = (self->target_rate * self->target_rate) / (2*evt->accel);
+        self->decel_steps = accel_steps;
+        self->accel_per_step = self->accel_rate / self->target_rate;
+
+        self->phase_acc = 0;
+        self->phase_inc = 0;
+
+        self->motion_state = STEPPER_STATE_ACCELERATE;
+        timed_event_arm(&self->te, 1,1); 
+    } break;
+
+    ////////////////////////////////////////////////////////
+    case TIMEOUT_SIG:{
+        self->phase_acc += self->phase_inc;
+        // when the phase acumulator reaches 1.0 in fixed point q16
+        if(self->phase_acc >= (1<<16)){
+            self->phase_acc = 0;
+            task_signal_post(self->super,EVENT_STEP);
+            gpio_toggle(self->gpio, self->pin_config.step_pin);
+        }
+    } break;
+
+    ////////////////////////////////////////////////////////
+    case EVENT_STEP:{
+        if(self->steps_remaining == 0) {
+            task_signal_post(self->super, EVENT_STOP);
+            break;
+        }
+        self->steps_remaining--;
+
+        switch (self->state) {
+            // increment the step rate until target is reached or deceleration is needed
+            case STEPPER_STATE_ACCELERATE:{
+                if(self->steps_remaining <= self->decel_steps){
+                    self->motion_state = STEPPER_STATE_DEACCELERATE;
+                }
+                self->step_rate += self->accel_per_step;
+                if(self->step_rate >= self->target_rate){
+                    self->step_rate = self->target_rate;
+                    self->motion_state = STEPPER_STATE_CONSTANT_SPEED;
+                }
+            } break;
+            // continue with same step rate 
+            case STEPPER_STATE_CONSTANT_SPEED:{
+                if(self->steps_remaining <= self->decel_steps){
+                    self->motion_state = STEPPER_STATE_DEACCELERATE;
+                }
+            }break;
+            // decrement the step rate until stoped
+            case STEPPER_STATE_DEACCELERATE:{
+                if(self->step_rate > self->accel_per_step){
+                    self->step_rate -= self->accel_per_step;
+                }else{
+                    self->step_rate = 0;
+                }
+            }break;
+            default:
+                break;
+        }
+        // update phase increment
+        self->phase_inc = (self->step_rate << 16) / self->tick_freq;
+    }break;
+    ////////////////////////////////////////////////////////
+    case EVENT_STOP:{
+        timer2x_disable(self->period_counter);
+        self->phase_acc = 0;
+        self->phase_inc = 0;
+        self->target_rate = 0;
+        self->decel_steps = 0;
+        self->accel_per_step = 0;
+        self->steps_remaining = 0;
+        self->state = EVENT_IDLE;
+    ////////////////////////////////////////////////////////
+    }break;
+    default:
+        break;
+    }
+}

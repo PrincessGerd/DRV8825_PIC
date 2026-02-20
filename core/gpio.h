@@ -40,27 +40,13 @@ typedef enum {
     RD_0, RD_1,  RD_2,  RD_3,  RD_4,  RD_5,  RD_6,  RD_7, // PORTD
 } gpio_pin;
 
-// left as a interface since it might be used as a interface for a gpio expander
-struct gpio_ops;
-typedef const struct gpio_ops ** gpio_t;
-struct gpio_ops{
-    void (*write_pin)(gpio_t dev, uint8_t pin, bool value);
-    void (*read_pin)(gpio_t dev, uint8_t pin, bool* value);
-    void (*toggle_pin)(gpio_t dev, uint8_t pin);
-    void (*set_mode)(gpio_t dev, uint8_t pin, gpio_mode_e mode);
-    void (*set_direction)(gpio_t dev, uint8_t pin, gpio_dir_e direction);
-};
+void gpio_set(uint8_t io_pin);
+void gpio_clear(uint8_t io_pin);
+void gpio_write(uint8_t io_pin, bool value);
+void gpio_read(uint8_t io_pin, bool* value);
+void gpio_toggle(uint8_t io_pin);
+void gpio_set_mode(uint8_t io_pin, gpio_mode_e mode);
+void gpio_set_direction(uint8_t io_pin, gpio_dir_e direction);
 
-void gpio_instance(gpio_t* inst_out);
-#define gpio_set(gpio,pin)((*(gpio))->write_pin(gpio,pin,true))
-#define gpio_clear(gpio,pin)((*(gpio))->write_pin(gpio,pin,false))
-#define gpio_write(gpio,pin,val)((*(gpio))->write_pin(gpio,pin,val))
-#define gpio_toggle(gpio,pin)((*(gpio))->toggle_pin(gpio,pin))
-#define gpio_set_mode(gpio,pin,mode)((*(gpio))->set_mode(gpio,pin,mode))
-#define gpio_set_direction(gpio,pin,direction)((*(gpio))->set_direction(gpio,pin,direction))
-
-// should be seperate in a pinmux implementation
-void pps_lock(void);
-void pps_unlock(void);
 #endif	/* GPIO_H */
 

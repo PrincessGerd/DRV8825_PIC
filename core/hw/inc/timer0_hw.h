@@ -17,16 +17,17 @@ typedef enum {
 
 typedef struct {
     tmr0_clk_src_e clk_src;
-    uint8_t prescaler; // TODO: make a enum for this
-    uint8_t postscaler; // TODO: make a enum for this
+    uint8_t prescaler;  // 1 -> 32768, exponential
+    uint8_t postscaler; // 1 -> 16,    linear
     bool async;
 } timer0_config_t;
 
 struct timer0_hw;
-void create_timer0(const struct timer0_hw** timer0_hw_inst_out, bool mode16bit);
-void timer0_init(const struct timer0_hw*  self, timer0_config_t* config);
-void timer0_enable(const struct timer0_hw* self);
-void timer0_disable(const struct timer0_hw* self);
-void timer0_set_counter(const struct timer0_hw* self, uint16_t value);
-void timer0_read_counter(const struct timer0_hw* self, uint16_t* count);
+void timer0_create(struct timer0_hw const** timer0_hw_inst_out, bool mode16bit);
+void timer0_init(struct timer0_hw* const self, timer0_config_t* config);
+void timer0_enable(struct timer0_hw* const self);
+void timer0_disable(struct timer0_hw* const self);
+void timer0_set_counter(struct timer0_hw* const self, uint16_t value);
+void timer0_read_counter(struct timer0_hw* const self, uint16_t* count);
+void timer0_set_prescaler(struct timer0_hw* const self, uint8_t prescaler);
 #endif

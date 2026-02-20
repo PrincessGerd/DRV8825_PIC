@@ -1,23 +1,5 @@
 #include "../gpio.h"
 #include <xc.h>
-// singleton implementation of gpio
-
-void _gpio_write_pin(gpio_t dev, uint8_t io_pin, bool value);
-void _gpio_read_pin(gpio_t dev, uint8_t io_pin, bool* value);
-void _gpio_toggle_pin(gpio_t dev, uint8_t io_pin);
-void _gpio_set_mode(gpio_t dev, uint8_t io_pin, gpio_mode_e mode);
-void _gpio_set_direction(gpio_t dev, uint8_t io_pin, gpio_dir_e direction);
-
-struct pic18f16{gpio_t dev;};
-static struct pic18f16 instance;
-static struct gpio_ops pic18f_gpio_ops = {
-    .write_pin = _gpio_write_pin,
-    .read_pin = _gpio_read_pin,
-    .toggle_pin = _gpio_toggle_pin,
-    .set_mode = _gpio_set_mode,
-    .set_direction = _gpio_set_direction
-};
-
 
 // [7:5] zeros, [4:3] port, [2:0] pin
 #define PORT_COUNT (3u)
@@ -36,15 +18,7 @@ static inline uint8_t io_pin_bit(uint8_t pin){
     return (uint8_t)(1 << (pin & IO_PIN_MASK)); }
 
 
-void gpio_instance(gpio_t* inst_out){
-    if(!instance.dev){
-        instance.dev = &pic18f_gpio_ops;
-    }
-    *inst_out = &instance.dev;
-}
-
-void _gpio_write_pin(gpio_t dev, uint8_t io_pin, bool value) {
-    (void)dev;
+void gpio_write_pin(uint8_t io_pin, bool value) { 
     const uint8_t port = io_port(io_pin);
     const uint8_t pin = io_pin_bit(io_pin);
     if(value){
@@ -54,22 +28,22 @@ void _gpio_write_pin(gpio_t dev, uint8_t io_pin, bool value) {
     }
 }
 
-void _gpio_read_pin(gpio_t dev, uint8_t io_pin, bool* value){
-    (void)dev;
+inline void gpio_set(uint8_t io_pin){gpio_write_pin(io_pin,true);}
+inline void gpio_clear(uint8_t io_pin){gpio_write_pin(io_pin,false);}
+
+void gpio_read_pin(uint8_t io_pin, bool* value){   
     const uint8_t port = io_port(io_pin);
     const uint8_t pin = io_pin_bit(io_pin);
     *value = pin & (*io_port_register[port]);
 }
 
-void _gpio_toggle_pin(gpio_t dev, uint8_t io_pin){
-    (void)dev;
+void gpio_toggle_pin(uint8_t io_pin){
     const uint8_t port = io_port(io_pin);
     const uint8_t pin = io_pin_bit(io_pin);
     *io_latch_register[port] ^= pin;
 }
 
-void _gpio_set_mode(gpio_t dev, uint8_t io_pin, gpio_mode_e mode){
-    (void)dev;
+void gpio_set_mode(uint8_t io_pin, gpio_mode_e mode){
     const uint8_t port = io_port(io_pin);
     const uint8_t pin = io_pin_bit(io_pin);
     switch (mode) {
@@ -82,8 +56,7 @@ void _gpio_set_mode(gpio_t dev, uint8_t io_pin, gpio_mode_e mode){
         break;
     }
 }
-void _gpio_set_direction(gpio_t dev, uint8_t io_pin, gpio_dir_e direction){
-    (void)dev;
+void gpio_set_direction(uint8_t io_pin, gpio_dir_e direction){
     const uint8_t port = io_port(io_pin);
     const uint8_t pin = io_pin_bit(io_pin);
     switch (direction) {
@@ -96,20 +69,4 @@ void _gpio_set_direction(gpio_t dev, uint8_t io_pin, gpio_dir_e direction){
     default:
         break;
     }
-}
-/*----------------------------------------------------------------*/
-void pps_unlock(void) {
-    INTCON0bits.GIE = 0;    // Suspend interrupts
-    PPSLOCK = 0x55;         // Required sequences
-    PPSLOCK = 0xAA;
-    PPSLOCKbits.PPSLOCKED = 0;
-    INTCON0bits.GIE = 1;    // Restore interrupts
-}
-
-void pps_lock(void) {
-    INTCON0bits.GIE = 0;    // Suspend interrupts
-    PPSLOCK = 0x55;         // Required sequences
-    PPSLOCK = 0xAA;
-    PPSLOCKbits.PPSLOCKED = 1;
-    INTCON0bits.GIE = 1;    // Restore interrupts
 }

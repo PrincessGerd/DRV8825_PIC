@@ -1,5 +1,5 @@
 #include "../inc/clcx_hw.h"
-#include "registers.h"
+#include "../registers.h"
 #include "../registers.h"
 
 typedef struct clcx_hw{

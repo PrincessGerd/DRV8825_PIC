@@ -2,14 +2,14 @@
 #include "../registers.h"
 #include <stdint.h>
 
-typedef struct timer2x_hw{
+struct timer2x_hw{
     volatile uint8_t* TMR;
     volatile uint8_t* PR;
     volatile uint8_t* CON;
     volatile uint8_t* HLT;
     volatile uint8_t* CLKCON;
     volatile uint8_t* RST;
-} timer2x_hw_t;
+};
 
 
 void create_timer2x(const struct timer2x_hw **timer2x_hw_inst_out, uint8_t module_num){
@@ -61,3 +61,6 @@ void timer2x_read_counter(const struct timer2x_hw* self, uint8_t* count){
     }
 }
 
+void timer2x_set_prescaler(const struct timer2x_hw* self, timer_prescaler_e prescaler){
+    *self->CON  |= TMR_CON_CKPS_MASK  & (prescaler << TMR_CON_CKPS_SHIFT);
+}
