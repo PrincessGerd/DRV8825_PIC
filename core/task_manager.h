@@ -2,7 +2,6 @@
 #define TASK_MANAGER_H
 #include <stdbool.h>
 #include <stdint.h>
-#include <xc.h>
 
 #define MESSAGE_MAX_LENGTH 8
 typedef enum{
@@ -26,17 +25,17 @@ typedef struct task {
     event_handler_t dispatch;
 } task_t;
 
-static void task_create(
+void task_create(
     task_t* const self, 
     event_handler_t init, 
     event_handler_t dispatch);
 
-static void task_enable(
+void task_start(
     task_t* const self,
-    struct event** const queue,
     uint8_t capacity,
-    uint8_t irq_num,
-    tm_priority_e prio);
+    tm_priority_e prio,
+    struct event const** queue,
+    struct event const * const ie);
 
 // base event type, message
 typedef uint8_t signal_t;
@@ -80,20 +79,18 @@ void timed_event_disarm(
 
 // fast tick events with imediate dispatch for motor controll
 struct fast_tickEvt;
-static struct fast_tickEvt const *fast_tickEvt_head;
+static struct fast_tickEvt *fast_tickEvt_head;
 typedef struct fast_tickEvt{
     event_t super;
     uint32_t accumulator;
     uint32_t incrementor;
-    event_handler_t dispatch;
-    struct timed_event* next;
+    struct fast_tickEvt* next;
 } fast_tickEvt_t;
 
 void fast_tick_event_create(
     fast_tickEvt_t* const self, 
     task_t* const owner,
-    signal_t signal,
-    const event_handler_t dispatch);
+    signal_t signal);
 
 void fast_tick_event_arm(
     fast_tickEvt_t* const self, 

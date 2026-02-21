@@ -1,6 +1,5 @@
 #include "../inc/timer0_hw.h"
 #include "../registers.h"
-#include "../core/hwlock.h"
 #include <assert.h>
 
 struct timer0_hw{
@@ -9,14 +8,12 @@ struct timer0_hw{
     volatile uint8_t* TMR0_CON0;
     volatile uint8_t* TMR0_CON1;
     uint8_t mode_16bit;
-    hwlock_t lock;
 };
 
 void timer0_create(struct timer0_hw const** timer0_hw_inst_out, bool mode16bit){
     static struct timer0_hw hw;
     assert(timer0_hw_inst_out != 0 );
     if(!timer0_hw_inst_out){return;}
-    hw.lock.owner = HW_OWNER_NONE;
     
     const uintptr_t base = TMR0_BASE_ADDRESS;
     hw.TMR0L     = (volatile uint8_t*)(base + TMR0_TMRL_OFFSET);

@@ -28,8 +28,8 @@ void gpio_write_pin(uint8_t io_pin, bool value) {
     }
 }
 
-inline void gpio_set(uint8_t io_pin){gpio_write_pin(io_pin,true);}
-inline void gpio_clear(uint8_t io_pin){gpio_write_pin(io_pin,false);}
+void gpio_set(uint8_t io_pin){gpio_write_pin(io_pin,true);}
+void gpio_clear(uint8_t io_pin){gpio_write_pin(io_pin,false);}
 
 void gpio_read_pin(uint8_t io_pin, bool* value){   
     const uint8_t port = io_port(io_pin);

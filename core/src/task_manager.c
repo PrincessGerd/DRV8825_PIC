@@ -27,7 +27,7 @@ static volatile uint8_t lock_count = 0;
 #define PTR_ADD(p,val)  ((event_t* const)(p) + (val))
 #define PTR_SUB(p,val)  ((event_t* const)(p) - (val))
 
-static void task_create(
+void task_create(
     task_t* const self, 
     event_handler_t init, 
     event_handler_t dispatch){
@@ -35,18 +35,17 @@ static void task_create(
         self->dispatch = dispatch;
 }
 
-static void task_start(
+void task_start(
     task_t* const self,
-    event_t const** queue,
     uint8_t capacity,
-    uint8_t irq_num,
-    tm_priority_e prio ){
+    tm_priority_e prio,
+    event_t const** queue,
+    event_t const * const ie){
         self->queue = queue;
         self->capacity = capacity;
         self->head = 0;
         self->tail = 0;
         self->count = 0;
-        self->irq_num = irq_num;
         self->prio = prio;
         interrupt_set_priority(self->irq_num, self->prio == TM_HIGH_PRIORITY);
         interrupt_enable(self->irq_num);
@@ -118,12 +117,10 @@ void timed_event_disarm(timed_event_t* const self){
 void fast_tick_event_create(
     fast_tickEvt_t* const self, 
     task_t* const owner,
-    signal_t signal,
-    event_handler_t const dispatch){
+    signal_t signal){
         LOCK();
         self->super.owner    = owner;
         self->super.signal   = signal;
-        self->dispatch = dispatch;
         UNLOCK();
     }
 
@@ -145,7 +142,7 @@ void fast_tick_event_disarm(
     fast_tickEvt_t* prev = fast_tickEvt_head;
     for(fast_tickEvt_t* ft = fast_tickEvt_head;
         ft != (fast_tickEvt_t*)0;
-        ft->next){
+        ft = ft->next){
         LOCK();
         if(ft == self){
             prev->next = ft->next;
@@ -163,11 +160,11 @@ void fast_tick(void){
         ft = ft->next){
         LOCK();;
             ft->accumulator += ft->incrementor;
-            if(ft->accumulator >= (1 << 16)){ // uses q16 fp
-                ft->accumulator -= (1 << 16);
-                UNLOCK();;
-                ft->dispatch(ft->super.owner, &ft->super);
+            if(ft->accumulator >= (1UL << 16)){ // uses q16 fp
+                ft->accumulator -= (1UL << 16);
+                UNLOCK();
+                ft->super.owner->dispatch(ft->super.owner,&ft->super);
             }
         }
-    UNLOCK();;
+    UNLOCK();
 }

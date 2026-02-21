@@ -13,9 +13,10 @@
 #include "../core/task_manager.h"
 
 enum signals{
-    TIMEOUT_SIG,
+    FAST_TICK_TIMEOUT_SIG,
     STEPPER_WORK_SIG,
-    STEPPER_
+    STEPPER_STOP_SIG,
+    STEPPER_DONE_SIG
 };
 
 typedef struct stepper_workEvt{
@@ -25,9 +26,7 @@ typedef struct stepper_workEvt{
     uint32_t  accel; 
 }stepper_workEvt_t;
 
-void stepper_init(void);
-extern task_t* const drv8825;
-
+void stepper_create(task_t const* self);
 #endif	/* STEPPER_H*/
 
 

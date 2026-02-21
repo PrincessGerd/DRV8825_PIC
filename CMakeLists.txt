@@ -36,8 +36,8 @@ endif()
 
 file(GLOB_RECURSE SOURCES
     src/*.c
-    core/*.c
-    core/hw/*.c
+    core/src/*.c
+    core/hw/src/*.c
 )
 add_executable(${PROJECT_NAME} ${SOURCES})
 
