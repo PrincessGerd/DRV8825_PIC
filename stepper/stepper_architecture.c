@@ -1,4 +1,4 @@
-#include "../inc/stepper.h"
+#include "stepper.h"
 #include "stepper_device.h"
 // core
 #include "../core/types.h"
@@ -7,6 +7,7 @@
 //
 #include <stdint.h>
 #include <stdbool.h>
+#include <xc.h>
 
 typedef enum{
     STEPPER_STATE_ACCELERATE,
@@ -21,68 +22,75 @@ struct stepper{
     motion_states_e motion_state;
     stepper_device_t    device;
 
-    uint32_t tick_freq;         // frequency of timer 
-    uint32_t phase_acc;         // phase accumulator
-    uint32_t phase_inc;         // phase increment
+    uint16_t tick_freq;         // frequency of timer 
+    uint16_t phase_acc;         // phase accumulator
+    uint16_t phase_inc;         // phase increment
 
-    uint32_t step_rate;         // current speed (steps/sec)
-    uint32_t target_rate;       // desired speed (steps/sec)
-    uint32_t accel_per_step;    // acceleration increase per step
+    uint16_t step_rate;         // current speed (steps/sec)
+    uint16_t target_rate;       // desired speed (steps/sec)
+    uint16_t accel_per_step;    // acceleration increase per step
 
-    uint32_t decel_steps;       // steps required to decelarate
-    uint32_t steps_remaining;   // steps to done
+    uint16_t decel_steps;       // steps required to decelarate
+    uint16_t steps_remaining;   // steps to done
     uint8_t dir_state;          // current direction
     uint8_t step_pin;           // step pin
 };
 
-static void stepper_init(struct stepper* const self, event_t const* const ie);
-static void stepper_dispatch(struct stepper* const self, event_t* const event);
+static void stepper_init(task_t* const super, event_t const* const ie);
+void stepper_dispatch(task_t* const super, event_t* const e);
 
-void stepper_create(task_t const* self){
+void stepper_create(task_t** self){
     static struct stepper stepper_inst;
-    task_t * const stepper = &stepper_inst.super;
     create_stepper_device(&stepper_inst.device);
-    task_create(stepper,
+    task_create(&stepper_inst.super,
         (event_handler_t)&stepper_init,
         (event_handler_t)&stepper_dispatch);
-    self = stepper;
+    *self = &stepper_inst.super;
 }
 
-static void stepper_init(struct stepper* const self, event_t const* const ie){
-    (*(self->device))->init(self->device, 0);
+static void stepper_init(task_t* const super, event_t const* const ie){
+    struct stepper* self = container_of(super, struct stepper, super); 
+    struct stepper_initEvt* initial_event = container_of(ie, struct stepper_initEvt, super);
+    (*(self->device))->init(self->device, &initial_event->pins);
+    self->step_pin = initial_event->pins.step_pin;
+
 }
 
-static void stepper_dispatch(struct stepper* const self, event_t* const event){
-    switch (event->signal) {
+void stepper_dispatch(task_t* const super, event_t* const e){
+    struct stepper* self = container_of(super, struct stepper, super); 
+    switch (e->signal) {
     ////////////////////////////////////////////////////////
         case STEPPER_WORK_SIG:{
-            stepper_workEvt_t* evt = 
-                container_of(event, struct stepper_workEvt, super);
+            stepper_workEvt_t* evt = (stepper_workEvt_t*)e;
             // set the given values for step and desired speed for this event
-            self->steps_remaining = evt->steps; 
-            self->target_rate = evt->speed;     
+            uint16_t evt_steps = evt->steps;
+            uint16_t evt_rate = evt->speed;
+            uint16_t evt_accel = evt->accel;
+
+            self->steps_remaining = evt_steps;
+            self->target_rate = evt_rate;     
             self->step_rate   = 0;
 
             // calculate the acceleration and deceleration steps and step-rate needed
-            uint32_t accel_steps = (self->target_rate * self->target_rate) / (2*evt->accel);
-            self->decel_steps = accel_steps;
-            self->accel_per_step =  self->target_rate / accel_steps;
-
+            uint32_t temp = (uint32_t)self->target_rate * (uint32_t)self->target_rate;
+            temp /= (uint32_t)(2u * evt_accel);
+            uint16_t accel_steps = (uint16_t)temp;
             // set initial values for phase increment
             self->phase_acc = 0;
-            self->phase_inc = (self->accel_per_step << 16) / self->tick_freq;
-            
+            uint32_t temp2 = (uint32_t)self->accel_per_step * 65536u;
+            temp2 /= self->tick_freq;
+            self->phase_inc = (uint16_t)temp2;
             // set state for the fast tick state machine, and post the event
             self->motion_state = STEPPER_STATE_ACCELERATE;
             fast_tick_event_create(&self->fte, &self->super, FAST_TICK_TIMEOUT_SIG);
             fast_tick_event_arm(&self->fte, self->phase_acc, self->phase_inc);
-
+            gpio_toggle(self->step_pin);
         } break;
     ////////////////////////////////////////////////////////
         case FAST_TICK_TIMEOUT_SIG:{
             self->phase_acc += self->phase_inc;
             // when the phase acumulator reaches 1.0 in fixed point q16  (should be changed, but even fixedpoint is easier)
-            if(self->phase_acc >= (1UL <<16)){
+            if(self->phase_acc >= 65535){
                 self->phase_acc = 0;
                 // each fast tick is the half period of the pulse
                 gpio_toggle(self->step_pin);
@@ -122,7 +130,10 @@ static void stepper_dispatch(struct stepper* const self, event_t* const event){
                         break;
                 }
                 // update phase increment
-                self->phase_inc = (self->step_rate << 16) / self->tick_freq;
+                uint32_t temp2 = (uint32_t)self->accel_per_step * 65536u;
+                temp2 /= self->tick_freq;
+                self->phase_inc = (uint16_t)temp2;
+                fast_tick_event_arm(&self->fte, self->phase_acc, self->phase_inc);
             }
         } break;
 

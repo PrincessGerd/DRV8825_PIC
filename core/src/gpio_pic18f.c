@@ -18,7 +18,7 @@ static inline uint8_t io_pin_bit(uint8_t pin){
     return (uint8_t)(1 << (pin & IO_PIN_MASK)); }
 
 
-void gpio_write_pin(uint8_t io_pin, bool value) { 
+void gpio_write(uint8_t io_pin, bool value) { 
     const uint8_t port = io_port(io_pin);
     const uint8_t pin = io_pin_bit(io_pin);
     if(value){
@@ -28,16 +28,16 @@ void gpio_write_pin(uint8_t io_pin, bool value) {
     }
 }
 
-void gpio_set(uint8_t io_pin){gpio_write_pin(io_pin,true);}
-void gpio_clear(uint8_t io_pin){gpio_write_pin(io_pin,false);}
+void gpio_set(uint8_t io_pin){gpio_write(io_pin,true);}
+void gpio_clear(uint8_t io_pin){gpio_write(io_pin,false);}
 
-void gpio_read_pin(uint8_t io_pin, bool* value){   
+void gpio_read(uint8_t io_pin, bool* value){   
     const uint8_t port = io_port(io_pin);
     const uint8_t pin = io_pin_bit(io_pin);
     *value = pin & (*io_port_register[port]);
 }
 
-void gpio_toggle_pin(uint8_t io_pin){
+void gpio_toggle(uint8_t io_pin){
     const uint8_t port = io_port(io_pin);
     const uint8_t pin = io_pin_bit(io_pin);
     *io_latch_register[port] ^= pin;

@@ -1,4 +1,4 @@
-#include "../inc/stepper_device.h"
+#include "stepper_device.h"
 // core
 #include "../core/types.h"
 #include "../core/gpio.h"
@@ -15,16 +15,7 @@ struct drv8825{
     uint8_t     mode2_pin;
 };
 
-typedef struct{
-    uint8_t step_pin;
-    uint8_t dir_pin;
-    uint8_t enable_pin;
-    uint8_t mode0_pin;
-    uint8_t mode1_pin;
-    uint8_t mode2_pin;
-} drv8825_pin_config_t;
-
-static void drv8825_init(stepper_device_t dev, void* pin_cfg);
+static void drv8825_init(stepper_device_t dev, stepper_pins_t* pin_cfg);
 static void drv8825_enable(stepper_device_t dev);
 static void drv8825_disable(stepper_device_t dev);
 static void drv8825_set_direction(stepper_device_t dev, stepper_dir_e dir);
@@ -45,9 +36,8 @@ void create_stepper_device(stepper_device_t* out_dev) {
     *out_dev = &self.dev;
 }
 
-static void drv8825_init(stepper_device_t dev, void* pin_cfg){
+static void drv8825_init(stepper_device_t dev, stepper_pins_t* cfg){
     struct drv8825* self = container_of(dev, struct drv8825, dev);
-    drv8825_pin_config_t* cfg = (drv8825_pin_config_t*)pin_cfg;
     self->dir_pin = cfg->dir_pin;
     self->enable_pin = cfg->enable_pin;
     self->mode0_pin = cfg->mode0_pin;

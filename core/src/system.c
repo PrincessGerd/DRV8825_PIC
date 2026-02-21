@@ -1,7 +1,7 @@
 #include "../system.h"
 #include "../core/hw/inc/timer0_hw.h"
 #include "../core/hw/inc/timer1_hw.h"
-
+#include "../task_manager.h"
 #include <stdint.h>
 #include <xc.h>
 
@@ -75,6 +75,9 @@ void systick_config(uint32_t freq, system_timer_e timer){
     }
 }
 
+void __interrupt(high_priority) timer0_isr(void){
+    fast_tick();
+}
 
 void systick_handler(void){
 

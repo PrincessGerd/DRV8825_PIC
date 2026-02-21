@@ -8,7 +8,7 @@ static volatile uint8_t lock_count = 0;
 #define LOCK() \
     do { \
         if(lock_count == 0) { \
-            disable_global_interrupts(); \
+            (void)disable_global_interrupts(); \
         } \
         lock_count++; \
     } while(0)
@@ -18,12 +18,12 @@ static volatile uint8_t lock_count = 0;
         if(lock_count > 0) { \
             lock_count--; \
             if(lock_count == 0) { \
-                enable_global_interrupts(); \
+                (void)enable_global_interrupts(); \
             } \
         } \
     } while(0)
 
-#define mod(a,b) (a & (b-1))
+#define mod(a,b) (a & (b-1u))
 #define PTR_ADD(p,val)  ((event_t* const)(p) + (val))
 #define PTR_SUB(p,val)  ((event_t* const)(p) - (val))
 
@@ -47,6 +47,7 @@ void task_start(
         self->tail = 0;
         self->count = 0;
         self->prio = prio;
+        self->init(self,ie);
         interrupt_set_priority(self->irq_num, self->prio == TM_HIGH_PRIORITY);
         interrupt_enable(self->irq_num);
 }
@@ -70,11 +71,13 @@ void task_signal_post(task_t* const self,  signal_t signal){
 void task_event_consume(task_t* const self){
     LOCK();
     event_t* event;
-    if (self->count > 0) {
-        event = self->queue[mod((self->head + 1), self->capacity)];
-        self->head = mod((self->head + 1), self->capacity);
-        self->count--;
+    if (self->count == 0) {
+        UNLOCK();
+        return;
     }
+    event = PTR_ADD(self->queue,mod((self->head + 1), self->capacity));
+    self->head = mod((self->head + 1), self->capacity);
+    self->count--;
     UNLOCK();
     self->dispatch(self, event);
 }
@@ -84,7 +87,7 @@ void event_create(
     task_t* const owner, 
     signal_t signal){
         LOCK();
-        self->owner = owner;
+        *self->owner = *owner;
         self->signal = signal;
         UNLOCK();
 }
@@ -94,7 +97,7 @@ void timed_event_create(
     task_t* const owner, 
     signal_t signal){
         LOCK();
-        self->super.owner = owner;
+        *self->super.owner = *owner;
         self->super.signal = signal;
         self->next  = tevent_head;
         tevent_head = self;
@@ -115,19 +118,18 @@ void timed_event_disarm(timed_event_t* const self){
 }
 
 void fast_tick_event_create(
-    fast_tickEvt_t* const self, 
+    fast_tickEvt_t* self, 
     task_t* const owner,
     signal_t signal){
         LOCK();
-        self->super.owner    = owner;
-        self->super.signal   = signal;
+        event_create(&self->super,owner,signal);
         UNLOCK();
     }
 
 void fast_tick_event_arm(
-    fast_tickEvt_t* const self, 
-    uint32_t accumulator, 
-    uint32_t incrementor){
+    fast_tickEvt_t* self, 
+    uint16_t accumulator, 
+    uint16_t incrementor){
         LOCK();
         self->accumulator = accumulator;
         self->incrementor = incrementor;
@@ -137,7 +139,7 @@ void fast_tick_event_arm(
     }
 
 void fast_tick_event_disarm(
-    fast_tickEvt_t* const self){
+    fast_tickEvt_t* self){
     // remove fast tick event from list
     fast_tickEvt_t* prev = fast_tickEvt_head;
     for(fast_tickEvt_t* ft = fast_tickEvt_head;
@@ -160,8 +162,8 @@ void fast_tick(void){
         ft = ft->next){
         LOCK();;
             ft->accumulator += ft->incrementor;
-            if(ft->accumulator >= (1UL << 16)){ // uses q16 fp
-                ft->accumulator -= (1UL << 16);
+            if(ft->accumulator >= 65535){ // uses q16 fp
+                ft->accumulator -= 65535;
                 UNLOCK();
                 ft->super.owner->dispatch(ft->super.owner,&ft->super);
             }

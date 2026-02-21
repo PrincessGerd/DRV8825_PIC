@@ -11,6 +11,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../core/task_manager.h"
+#include "stepper_device.h"
 
 enum signals{
     FAST_TICK_TIMEOUT_SIG,
@@ -20,13 +21,19 @@ enum signals{
 };
 
 typedef struct stepper_workEvt{
-    event_t   super;
-    uint32_t  steps;
-    uint32_t  speed;
-    uint32_t  accel; 
+    fast_tickEvt_t  super;
+    uint16_t        steps;
+    uint16_t        speed;
+    uint16_t        accel; 
 }stepper_workEvt_t;
 
-void stepper_create(task_t const* self);
+typedef struct stepper_initEvt{
+    fast_tickEvt_t super;
+    stepper_pins_t pins;
+}stepper_initEvt_t;
+
+struct stepper;
+void stepper_create(task_t** self);
 #endif	/* STEPPER_H*/
 
 

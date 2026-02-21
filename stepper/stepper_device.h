@@ -8,10 +8,19 @@ typedef enum {
     STEPPER_DIR_CCW
 } stepper_dir_e;
 
+typedef struct{
+    uint8_t step_pin;
+    uint8_t dir_pin;
+    uint8_t enable_pin;
+    uint8_t mode0_pin;
+    uint8_t mode1_pin;
+    uint8_t mode2_pin;
+} stepper_pins_t;
+
 struct stepper_ops;
 typedef const struct stepper_ops** stepper_device_t;
 struct stepper_ops{
-    void(*init)(stepper_device_t dev, void* cfg);
+    void(*init)(stepper_device_t dev, stepper_pins_t* cfg);
     void(*enable)(stepper_device_t dev);
     void(*disable)(stepper_device_t dev);
     void(*set_direction)(stepper_device_t dev,stepper_dir_e dir);

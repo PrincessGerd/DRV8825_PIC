@@ -40,7 +40,7 @@ void task_start(
 // base event type, message
 typedef uint8_t signal_t;
 typedef struct event{
-    task_t*  owner;      // pointer to the task that owns this event
+    task_t* const owner;      // pointer to the task that owns this event
     signal_t signal;     // signal of what should be handled by the dispatch task
 }event_t;
 
@@ -49,7 +49,7 @@ void task_event_consume(task_t* const self);
 void task_signal_post(task_t* const self,  signal_t signal);
 
 void event_create(
-    event_t* const self, // this event
+    event_t* self, // this event
     task_t* const owner, // the task this event belongs to
     signal_t signal);
 
@@ -82,21 +82,23 @@ struct fast_tickEvt;
 static struct fast_tickEvt *fast_tickEvt_head;
 typedef struct fast_tickEvt{
     event_t super;
-    uint32_t accumulator;
-    uint32_t incrementor;
+    uint16_t accumulator;
+    uint16_t incrementor;
     struct fast_tickEvt* next;
 } fast_tickEvt_t;
 
 void fast_tick_event_create(
     fast_tickEvt_t* const self, 
-    task_t* const owner,
+    task_t*  owner,
     signal_t signal);
 
 void fast_tick_event_arm(
-    fast_tickEvt_t* const self, 
-    uint32_t accumulator, 
-    uint32_t incrementor);
+    fast_tickEvt_t* self, 
+    uint16_t accumulator, 
+    uint16_t incrementor);
 
 void fast_tick_event_disarm(
     fast_tickEvt_t* const self);
+
+void fast_tick(void);
 #endif

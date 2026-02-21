@@ -38,6 +38,7 @@ file(GLOB_RECURSE SOURCES
     src/*.c
     core/src/*.c
     core/hw/src/*.c
+    stepper/*.c
 )
 add_executable(${PROJECT_NAME} ${SOURCES})
 
@@ -45,6 +46,7 @@ add_executable(${PROJECT_NAME} ${SOURCES})
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${XC8_PATH}/pic/include
     ${CMAKE_SOURCE_DIR}/inc
+    ${CMAKE_SOURCE_DIR}/stepper
     ${CMAKE_SOURCE_DIR}/core
     ${CMAKE_SOURCE_DIR}/core/hw/inc
 )
