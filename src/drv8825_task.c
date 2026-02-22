@@ -12,4 +12,14 @@ static stepper_initEvt_t const _drv8825_initEvt ={
         .mode2_pin  = RC_3       //rc3
     }
 };
+
+
+static stepper_workEvt_t const _drv8825_workEvt = {
+    .super.signal = STEPPER_WORK_SIG,
+    .accel = 0xFF,
+    .steps = 0xFFFE,
+    .speed = 0xFFFF
+};
+
 stepper_initEvt_t const* drv8825_initEvt = &_drv8825_initEvt;
+stepper_workEvt_t const* drv8825_workEvt = &_drv8825_workEvt;

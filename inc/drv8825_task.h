@@ -5,5 +5,5 @@
 
 
 extern stepper_initEvt_t const* drv8825_initEvt;
-//extern stepper_workEvt_t const* drv8825_workEvt;
+extern stepper_workEvt_t const* drv8825_workEvt;
 #endif

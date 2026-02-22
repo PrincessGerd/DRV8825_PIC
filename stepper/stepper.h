@@ -22,13 +22,13 @@ enum signals{
 
 typedef struct stepper_workEvt{
     event_t     super;
-    uint16_t    steps;
+    uint32_t    steps;
     uint16_t    speed;
     uint16_t    accel; 
 }stepper_workEvt_t;
 
 typedef struct stepper_initEvt{
-    event_t         super;
+    event_t   super;
     stepper_pins_t  pins;
 }stepper_initEvt_t;
 

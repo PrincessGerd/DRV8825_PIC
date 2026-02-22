@@ -2,6 +2,7 @@
 #include "../task_manager.h"
 #include "../interrupts.h"
 #include <stdint.h>
+#include "../core/gpio.h"
 #include <xc.h>
 
 static volatile uint8_t lock_count = 0;
@@ -76,7 +77,7 @@ void task_event_consume(task_t* self){
     self->dispatch(self, event);
 }
 
-static timed_event_t *fast_tick_EvtHead;
+static timed_event_t *fast_tick_EvtHead = 0;
 void fast_tick_event_create(
     timed_event_t* self, 
     task_t* owner,
@@ -104,33 +105,34 @@ void fast_tick_event_disarm(
     timed_event_t* self){
         LOCK();
         self->armed = false;
-        for(timed_event_t** te = &fast_tick_EvtHead;
-            *te != 0;
-            *te = (*te)->next){
+        timed_event_t** te = &fast_tick_EvtHead;
+        while(*te != 0){
             if((*te) == self){
                 (*te) = self->next;
                 break;
             }
+            *te = (*te)->next;
         }
         UNLOCK();
     }
 
 void fast_tick_handler(void){
-    LOCK();
-    for(timed_event_t** te = &fast_tick_EvtHead;
-      *te != 0;
-      *te = (*te)->next){
-        task_t* owner = (*te)->owner;
-        if(!(*te)->armed){
+    disable_global_interrupts();
+    timed_event_t* te = fast_tick_EvtHead;
+    while(te != 0){
+        task_t* owner = te->owner;
+        if (!te->armed) {
+            te = te->next;
             continue;
         }
-        if((*te)->accumulator >= (0xFFFF-1)){
-            (*te)->accumulator = (*te)->incrementor;
-            UNLOCK();
-            owner->dispatch(owner,&(*te)->super);
-        }else{
-            (*te)->accumulator += (*te)->incrementor;
+        if (te->accumulator <= te->incrementor) {
+            te->accumulator = te->incrementor;
+            owner->dispatch(owner,&te->super);
+            //gpio_toggle(RC_4);
+        }else {
+            te->accumulator -= te->incrementor;
         }
-      }
-    UNLOCK();
+        te = te->next;
+    }
+    enable_global_interrupts();
 }

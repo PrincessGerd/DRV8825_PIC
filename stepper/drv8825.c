@@ -44,11 +44,11 @@ static void drv8825_init(stepper_device_t dev, stepper_pins_t* cfg){
     self->mode1_pin = cfg->mode1_pin;
     self->mode2_pin = cfg->mode2_pin;
     gpio_set_mode(self->dir_pin,IO_MODE_DIGITAL);
+    gpio_set_direction(self->dir_pin,IO_DIR_OUTPUT);
     gpio_set_mode(self->enable_pin,IO_MODE_DIGITAL);
     gpio_set_mode(self->mode0_pin,IO_MODE_DIGITAL);
     gpio_set_mode(self->mode1_pin,IO_MODE_DIGITAL);
     gpio_set_mode(self->mode2_pin,IO_MODE_DIGITAL);
-    gpio_set_direction(self->dir_pin,IO_DIR_OUTPUT);
     gpio_set_direction(self->enable_pin,IO_DIR_OUTPUT);
     gpio_set_direction(self->mode0_pin,IO_DIR_OUTPUT);
     gpio_set_direction(self->mode1_pin,IO_DIR_OUTPUT);

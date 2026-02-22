@@ -91,7 +91,6 @@ void __interrupt(high_priority) isr(void){
     if(interrupt_flag(0x1D)){
         interrupt_clear(0x1D);
         timer0_set_counter(fast_tick_timer, (uint16_t)(0xFFFF - (fast_tick_period-1)));
-        gpio_toggle(RC_7);
         fast_tick_handler();
     }
 }

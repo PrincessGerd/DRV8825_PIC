@@ -32,7 +32,7 @@ struct stepper{
     uint16_t accel_per_step;    // acceleration increase per step
 
     uint16_t decel_steps;       // steps required to decelarate
-    uint16_t steps_remaining;   // steps to done
+    uint32_t steps_remaining;   // steps to done
     uint8_t dir_state;          // current direction
     uint8_t step_pin;           // step pin
 };
@@ -51,7 +51,7 @@ void stepper_create(task_t** self){
 
 static void stepper_init(task_t* const super, event_t const* const ie){
     struct stepper* self = container_of(super, struct stepper, super); 
-    struct stepper_initEvt* initial_event = container_of(ie, struct stepper_initEvt, super);
+    struct stepper_initEvt* initial_event = (struct stepper_initEvt*)ie;
     (*(self->device))->init(self->device, &initial_event->pins);
     self->step_pin = initial_event->pins.step_pin;
 }
@@ -63,12 +63,12 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         case STEPPER_WORK_SIG:{
             stepper_workEvt_t* evt = (stepper_workEvt_t*)e;
             // set the given values for step and desired speed for this event
-            uint16_t evt_steps = evt->steps;
+            uint32_t evt_steps = evt->steps;
             uint16_t evt_rate = evt->speed;
             uint16_t evt_accel = evt->accel;
 
-            self->steps_remaining = evt_steps;
-            self->target_rate = evt_rate;     
+            self->steps_remaining = 0xFFFFFF00;//evt_steps;
+            self->target_rate = 0xFFFE;//evt_rate;     
             self->step_rate   = 0;
 
             // calculate the acceleration and deceleration steps and step-rate needed
@@ -87,56 +87,54 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             fast_tick_event_create(&self->fte, super, FAST_TICK_TIMEOUT_SIG);
             fast_tick_event_arm(&self->fte, self->phase_acc, self->phase_inc);
         } break;
-    ////////////////////////////////////////////////////////
+        ////////////////////////////////////////////////////////
         case FAST_TICK_TIMEOUT_SIG:{
-            self->phase_acc += self->phase_inc;
-            // when the phase acumulator reaches 1.0 in fixed point q16  (should be changed, but even fixedpoint is easier)
-            if(self->phase_acc >= 65535){
-                self->phase_acc = 0;
-                // each fast tick is the half period of the pulse
-                //gpio_toggle(self->step_pin);
-                if(self->steps_remaining == 0) {
-                    self->motion_state = STEPPER_STATE_IDLE;
-                    self->evt.signal = STEPPER_DONE_SIG;
-                    task_event_post(super, &self->evt);
-                    break;
-                }
-                self->steps_remaining--;
-                switch (self->motion_state) {
-                    // increment the step rate until target is reached or deceleration is needed
-                    case STEPPER_STATE_ACCELERATE:{
-                        if(self->steps_remaining <= self->decel_steps){
-                            self->motion_state = STEPPER_STATE_DEACCELERATE;
-                        }
-                        self->step_rate += self->accel_per_step;
-                        if(self->step_rate >= self->target_rate){
-                            self->step_rate = self->target_rate;
-                            self->motion_state = STEPPER_STATE_CONSTANT_SPEED;
-                        }
-                    } break;
-                    // continue with same step rate 
-                    case STEPPER_STATE_CONSTANT_SPEED:{
-                        if(self->steps_remaining <= self->decel_steps){
-                            self->motion_state = STEPPER_STATE_DEACCELERATE;
-                        }
-                    }break;
-                    // decrement the step rate until stoped
-                    case STEPPER_STATE_DEACCELERATE:{
-                        if(self->step_rate > self->accel_per_step){
-                            self->step_rate -= self->accel_per_step;
-                        }else{
-                            self->step_rate = 0;
-                        }
-                    }break;
-                    default:    // idle state 
-                        break;
-                }
-                // update phase increment
-                uint32_t temp2 = (uint32_t)self->accel_per_step * 65536u;
-                temp2 /= self->tick_freq;
-                self->phase_inc = (uint16_t)temp2;
-                fast_tick_event_arm(&self->fte, self->phase_acc, self->phase_inc);
+            // each fast tick is the half period of the pulse
+            //gpio_toggle(self->step_pin);
+            if(self->steps_remaining == 0) {
+                self->motion_state = STEPPER_STATE_IDLE;
+                self->evt.signal = STEPPER_DONE_SIG;
+                gpio_clear(self->step_pin);
+                fast_tick_event_disarm(&self->fte);
+                task_event_post(super, &self->evt);
+                break;
             }
+            gpio_toggle(RC_4);
+            self->steps_remaining--;
+            switch (self->motion_state) {
+                // increment the step rate until target is reached or deceleration is needed
+                case STEPPER_STATE_ACCELERATE:{
+                    if(self->steps_remaining <= self->decel_steps){
+                        self->motion_state = STEPPER_STATE_DEACCELERATE;
+                    }
+                    self->step_rate += self->accel_per_step;
+                    if(self->step_rate >= self->target_rate){
+                        self->step_rate = self->target_rate;
+                        self->motion_state = STEPPER_STATE_CONSTANT_SPEED;
+                    }
+                } break;
+                // continue with same step rate 
+                case STEPPER_STATE_CONSTANT_SPEED:{
+                    if(self->steps_remaining <= self->decel_steps){
+                        self->motion_state = STEPPER_STATE_DEACCELERATE;
+                    }
+                }break;
+                // decrement the step rate until stoped
+                case STEPPER_STATE_DEACCELERATE:{
+                    if(self->step_rate > self->accel_per_step){
+                        self->step_rate -= self->accel_per_step;
+                    }else{
+                        self->step_rate = 0;
+                    }
+                }break;
+                default:    // idle state 
+                    break;
+            }
+            // update phase increment
+            uint32_t temp2 = (uint32_t)self->accel_per_step * 65536u;
+            temp2 /= self->tick_freq;
+            self->phase_inc = (uint16_t)temp2;
+            fast_tick_event_arm(&self->fte, self->phase_acc, self->phase_inc);
         } break;
 
         ////////////////////////////////////////////////////////
