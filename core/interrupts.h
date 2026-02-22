@@ -9,8 +9,8 @@ typedef enum{
     HIGH_PRIORITY = 1
 } int_prio_e;
 
-inline void enable_global_interrupts(void);
-inline void disable_global_interrupts(void);
+void enable_global_interrupts(void);
+void disable_global_interrupts(void);
 inline void interrupt_enable_priority();
 void interrupt_enable(uint8_t irq_num);
 void interrupt_disable(uint8_t irq_num);

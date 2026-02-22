@@ -6,10 +6,10 @@ static volatile uint8_t* const pie_list[NUM_INT_REGS] = {&PIE0, &PIE1, &PIE2, &P
 static volatile uint8_t* const pir_list[NUM_INT_REGS] = {&PIR0, &PIR1, &PIR2, &PIR3, &PIR4, &PIR5, &PIR6, &PIR7, &PIR8, &PIR9};
 static volatile uint8_t* const ipr_list[NUM_INT_REGS] = {&IPR0, &IPR1, &IPR2, &IPR3, &IPR4, &IPR5, &IPR6, &IPR7, &IPR8, &IPR9};
 
-inline void enable_global_interrupts(){
+void enable_global_interrupts(){
     INTCON0bits.GIE = 1;
 }
-inline void disable_global_interrupts(){
+void disable_global_interrupts(){
     INTCON0bits.GIE = 0;
 }
 

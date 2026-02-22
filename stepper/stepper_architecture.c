@@ -18,7 +18,8 @@ typedef enum{
 
 struct stepper{
     task_t super;
-    fast_tickEvt_t fte;
+    timed_event_t fte;
+    event_t       evt;
     motion_states_e motion_state;
     stepper_device_t    device;
 
@@ -37,7 +38,7 @@ struct stepper{
 };
 
 static void stepper_init(task_t* const super, event_t const* const ie);
-void stepper_dispatch(task_t* const super, event_t* const e);
+static void stepper_dispatch(task_t* const super, event_t* const e);
 
 void stepper_create(task_t** self){
     static struct stepper stepper_inst;
@@ -53,10 +54,9 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     struct stepper_initEvt* initial_event = container_of(ie, struct stepper_initEvt, super);
     (*(self->device))->init(self->device, &initial_event->pins);
     self->step_pin = initial_event->pins.step_pin;
-
 }
 
-void stepper_dispatch(task_t* const super, event_t* const e){
+static void stepper_dispatch(task_t* const super, event_t* const e){
     struct stepper* self = container_of(super, struct stepper, super); 
     switch (e->signal) {
     ////////////////////////////////////////////////////////
@@ -75,16 +75,17 @@ void stepper_dispatch(task_t* const super, event_t* const e){
             uint32_t temp = (uint32_t)self->target_rate * (uint32_t)self->target_rate;
             temp /= (uint32_t)(2u * evt_accel);
             uint16_t accel_steps = (uint16_t)temp;
+
             // set initial values for phase increment
             self->phase_acc = 0;
             uint32_t temp2 = (uint32_t)self->accel_per_step * 65536u;
             temp2 /= self->tick_freq;
             self->phase_inc = (uint16_t)temp2;
+
             // set state for the fast tick state machine, and post the event
             self->motion_state = STEPPER_STATE_ACCELERATE;
-            fast_tick_event_create(&self->fte, &self->super, FAST_TICK_TIMEOUT_SIG);
+            fast_tick_event_create(&self->fte, super, FAST_TICK_TIMEOUT_SIG);
             fast_tick_event_arm(&self->fte, self->phase_acc, self->phase_inc);
-            gpio_toggle(self->step_pin);
         } break;
     ////////////////////////////////////////////////////////
         case FAST_TICK_TIMEOUT_SIG:{
@@ -93,10 +94,11 @@ void stepper_dispatch(task_t* const super, event_t* const e){
             if(self->phase_acc >= 65535){
                 self->phase_acc = 0;
                 // each fast tick is the half period of the pulse
-                gpio_toggle(self->step_pin);
+                //gpio_toggle(self->step_pin);
                 if(self->steps_remaining == 0) {
                     self->motion_state = STEPPER_STATE_IDLE;
-                    task_signal_post(&self->super, STEPPER_DONE_SIG);
+                    self->evt.signal = STEPPER_DONE_SIG;
+                    task_event_post(super, &self->evt);
                     break;
                 }
                 self->steps_remaining--;
