@@ -46,30 +46,4 @@ typedef struct event{
 
 void task_event_post(task_t* self, struct event* event);
 void task_event_consume(task_t* self);
-
-typedef struct timed_event {
-    event_t super;
-    task_t*  owner;             // pointer to the task that owns this event
-    struct timed_event *next;   // 
-    uint16_t accumulator;       // 
-    uint16_t incrementor;       // 
-    bool armed;
-} timed_event_t;
-
-static timed_event_t *tevent_head;
-void fast_tick_event_create(
-    timed_event_t* self, 
-    task_t* owner,
-    signal_t signal);
-
-void fast_tick_event_arm(
-    timed_event_t* self, 
-    uint16_t accumulator, 
-    uint16_t incrementor);
-
-void fast_tick_event_disarm(
-    timed_event_t* self);
-
-
-void fast_tick_handler(void);
 #endif

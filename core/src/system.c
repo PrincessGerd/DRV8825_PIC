@@ -9,15 +9,8 @@
 
 struct timer1_hw* system_timer;
 struct timer0_hw* fast_tick_timer;
-static uint16_t fast_tick_period = 0xFFFF-1;
 static uint16_t sys_tick_period = 0xFFFF-1;
-
-static timer0_config_t fast_tick_config = {
-    .clk_src = TMR0_CLK_FOSC4,
-    .prescaler = 0,
-    .postscaler = 0,
-    .async = false
-};
+static uint32_t sys_tick_frequency = 0;
 
 static tmr1_config_t system_tick_config = {
     .clk_src = TMR1_CLK_FOSC4,
@@ -52,14 +45,14 @@ static void clock_initialize(void){
 }
 
 void system_init(void){
-    timer0_create(&fast_tick_timer, false);
     timer1_create(&system_timer);
     timer1_init(system_timer, &system_tick_config);
-    timer0_init(fast_tick_timer, &fast_tick_config);
+    interrupt_enable_priority();
+    enable_global_interrupts();
 }
 
-
 void systick_config(uint32_t freq, system_timer_e timer){
+    disable_global_interrupts();
     // loop over every prescaler value that timer2x can have
     const uint8_t ps_max = timer == FAST_TICK_TIMER ? 0xF : 0x4;
     for(uint8_t i = 0; i < ps_max; i++){
@@ -67,35 +60,14 @@ void systick_config(uint32_t freq, system_timer_e timer){
         uint8_t ps = (i << 1U);
         uint32_t period = SYSTEM_CLOCK_HZ / (ps * freq);
         if(period == 0){continue;} 
+        
         // if it fits within the 16bit period register, then return 
         if((period-1) <= 0xFFFF){
-            if(timer == FAST_TICK_TIMER){
-                fast_tick_period = period;
-                timer0_set_prescaler(fast_tick_timer, ps);
-                timer0_set_counter(fast_tick_timer, (uint16_t)(0xFFFF - (period-1)));
-                interrupt_enable(0x1D);
-                interrupt_set_priority(0x1D,true);
-                timer0_enable(fast_tick_timer);
-                interrupt_enable_priority();
-                enable_global_interrupts();
-            }else{
-                sys_tick_period = period;
-                timer1_set_prescaler(system_timer, ps);
-                timer1_set_counter(system_timer, (uint16_t)(0xFFFF - (period-1)));
-            }
+            sys_tick_frequency = SYSTEM_CLOCK_HZ / (ps*period);
+            sys_tick_period = (uint16_t)period;
+            timer1_set_prescaler(system_timer, ps);
+            timer1_set_counter(system_timer, (uint16_t)(0xFFFF - (period-1)));
         }
     }
+    enable_global_interrupts();
 }
-
-void __interrupt(high_priority) isr(void){
-    if(interrupt_flag(0x1D)){
-        interrupt_clear(0x1D);
-        timer0_set_counter(fast_tick_timer, (uint16_t)(0xFFFF - (fast_tick_period-1)));
-        fast_tick_handler();
-    }
-}
-
-//TODO:
-    // Add onStart
-    // Add systic handler, and fast_systtick handler
-    // find a place for the initialisation event for each module to be placed;

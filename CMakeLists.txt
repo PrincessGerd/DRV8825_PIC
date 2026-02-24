@@ -5,16 +5,13 @@ set(MICROCHIP_MCU PIC18F16Q20)
 set(CMAKE_C_COMPILER_ID_RUN TRUE) 
 set(CMAKE_C_COMPILER_WORKS TRUE) 
 
-if(NOT CMAKE_BUILD_TYPE) 
-    set(CMAKE_BUILD_TYPE Release) 
-endif() 
 
 set(CMAKE_PROJECT_NAME stepper) 
-project(${CMAKE_PROJECT_NAME} C ASM) 
+project(${CMAKE_PROJECT_NAME} C ASM)
 enable_language(C ASM)
 set(CMAKE_C_COMPILER_FORCED TRUE) 
 
-# get path to xc8 for includes and
+# get path to xc8 for includes and lib
 if(NOT DEFINED XC8_PATH)
     set(XC8_PATH "C:/Program Files/Microchip/xc8/v3.10")
 endif()
@@ -28,11 +25,15 @@ if(NOT DEFINED DFP_PATH)
         list(REVERSE DFP_VERSIONS)
         list(GET DFP_VERSIONS 0 DFP_PATH_LATEST)
     else()
-        message(FATAL_ERROR "No PIC18F-Q_DFP packs found in ${DFP_PATH}. Please install a DFP pack.")
+        message(FATAL_ERROR "No support pack found for ${MICROCHIP_MCU} in ${DFP_PATH}")
     endif()
     message(STATUS "Using DFP: ${DFP_PATH_LATEST}")
     set(DFP_PATH ${DFP_PATH_LATEST})
 endif()
+
+if(NOT CMAKE_BUILD_TYPE) 
+    set(CMAKE_BUILD_TYPE Release) 
+endif() 
 
 file(GLOB_RECURSE SOURCES
     src/*.c
@@ -42,7 +43,6 @@ file(GLOB_RECURSE SOURCES
 )
 add_executable(${PROJECT_NAME} ${SOURCES})
 
-# Include directories
 target_include_directories(${PROJECT_NAME} PRIVATE
     ${XC8_PATH}/pic/include
     ${CMAKE_SOURCE_DIR}/inc
@@ -51,7 +51,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
     ${CMAKE_SOURCE_DIR}/core/hw/inc
 )
 
-# Target compile/link options
+# required for linking
 target_compile_options(${PROJECT_NAME} PRIVATE
     -mcpu=${MICROCHIP_MCU}
     -mdfp=${DFP_PATH}/xc8

@@ -49,7 +49,6 @@ void task_start(
         self->tail = 0;
         self->count = 0;
         self->prio = prio;
-        TRISCbits.TRISC7 = 0;
         self->init(self,ie);
         //interrupt_set_priority(self->irq_num, self->prio == TM_HIGH_PRIORITY);
         //interrupt_enable(self->irq_num);
@@ -75,64 +74,4 @@ void task_event_consume(task_t* self){
     }
     UNLOCK();
     self->dispatch(self, event);
-}
-
-static timed_event_t *fast_tick_EvtHead = 0;
-void fast_tick_event_create(
-    timed_event_t* self, 
-    task_t* owner,
-    signal_t signal){
-        self->owner = owner;
-        self->super.signal = signal;
-        self->accumulator = 0;
-        self->incrementor = 0;
-        self->armed = false;
-        self->next = 0;
-    }
-
-void fast_tick_event_arm(
-    timed_event_t* self, 
-    uint16_t accumulator, 
-    uint16_t incrementor){
-        self->accumulator = accumulator;
-        self->incrementor = incrementor;
-        self->armed = true;
-        self->next = fast_tick_EvtHead;
-        fast_tick_EvtHead = self;
-    }
-
-void fast_tick_event_disarm(
-    timed_event_t* self){
-        LOCK();
-        self->armed = false;
-        timed_event_t** te = &fast_tick_EvtHead;
-        while(*te != 0){
-            if((*te) == self){
-                (*te) = self->next;
-                break;
-            }
-            *te = (*te)->next;
-        }
-        UNLOCK();
-    }
-
-void fast_tick_handler(void){
-    disable_global_interrupts();
-    timed_event_t* te = fast_tick_EvtHead;
-    while(te != 0){
-        task_t* owner = te->owner;
-        if (!te->armed) {
-            te = te->next;
-            continue;
-        }
-        if (te->accumulator <= te->incrementor) {
-            te->accumulator = te->incrementor;
-            owner->dispatch(owner,&te->super);
-            //gpio_toggle(RC_4);
-        }else {
-            te->accumulator -= te->incrementor;
-        }
-        te = te->next;
-    }
-    enable_global_interrupts();
 }

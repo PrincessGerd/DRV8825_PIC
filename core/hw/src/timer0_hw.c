@@ -42,7 +42,7 @@ void timer0_disable(struct timer0_hw* const self){
 }
 
 void timer0_read_counter(struct timer0_hw* const self, uint16_t* count){
-    if(!self->mode_16bit){
+    if(self->mode_16bit){
         uint16_t tmp = *self->TMR0L & 0xFF;     //get low byte
         tmp |= ((*self->TMR0H << 8u) & 0xFF00);  //set high byte of count
         *count = *self->TMR0L;      
@@ -53,7 +53,7 @@ void timer0_read_counter(struct timer0_hw* const self, uint16_t* count){
 
 void timer0_set_counter(struct timer0_hw* const self, uint16_t value){
     if((*(self->TMR0_CON0) & TMR0_CON0_EN_MASK) != 1){
-        if(!self->mode_16bit){
+        if(self->mode_16bit){
             *self->TMR0L = (uint8_t)(value & 0xFF);        // set low byte
             *self->TMR0H = (uint8_t)((value >> 8) & 0xFF); // set high byte
         }else{

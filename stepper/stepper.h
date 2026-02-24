@@ -14,12 +14,12 @@
 #include "stepper_device.h"
 
 enum signals{
-    FAST_TICK_TIMEOUT_SIG,
+    STEPPER_IDLE_SIG,
     STEPPER_WORK_SIG,
-    STEPPER_STOP_SIG,
-    STEPPER_DONE_SIG
+    STEPPER_DONE_SIG,
+    STEPPER_UPDATE_SIG,
+    DRIVER_FAULT_SIG
 };
-
 typedef struct stepper_workEvt{
     event_t     super;
     uint32_t    steps;
@@ -29,6 +29,7 @@ typedef struct stepper_workEvt{
 
 typedef struct stepper_initEvt{
     event_t   super;
+    uint32_t  tick_frequency;
     stepper_pins_t  pins;
 }stepper_initEvt_t;
 
