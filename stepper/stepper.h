@@ -25,9 +25,9 @@ enum signals{
 };
 typedef struct stepper_workEvt{
     event_t     super;
-    uint32_t    steps;
-    uint32_t    speed;
-    uint32_t    accel; 
+    uint16_t    steps;
+    uint16_t    speed;
+    uint16_t    accel; 
 }stepper_workEvt_t;
 
 typedef struct stepper_initEvt{

@@ -28,10 +28,15 @@ typedef struct {
 struct dma_hw;
 void dma_hw_create(uint8_t module_num, const struct dma_hw ** dma_hw_inst_out);
 void dma_hw_init(const struct dma_hw* self, const dma_hw_config_t* config);
+void dma_hw_configure(
+    const struct dma_hw* self,
+    uint16_t src,
+    uint16_t src_msg_size,
+    uint16_t dest,
+    uint16_t dst_msg_size);
+
 void dma_hw_set_startirq(const struct dma_hw* self, uint8_t irq_num);
 void dma_hw_set_abortirq(const struct dma_hw* self, uint8_t irq_num);
-void dma_hw_set_src(const struct dma_hw* self, uintptr_t srcAddr);
-void dma_hw_set_dst(const struct dma_hw* self, uintptr_t dstAddr);
 void dma_hw_set_hwint(const struct dma_hw* self, bool start_trigg, bool abort_trigg);
 void dma_hw_enable(const struct dma_hw* self);
 void dma_hw_disable(const struct dma_hw* self);

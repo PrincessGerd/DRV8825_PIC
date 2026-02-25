@@ -47,7 +47,7 @@ void pwm_hw_init(const struct pwm_hw* self, pwm_hw_config_t* config){
                     (config->out1_polarity_low << PWM_CFG_POL1_SHIFT) |
                     (config->out2_polarity_low << PWM_CFG_POL2_SHIFT) |
                     (config->push_pull_mode << PWM_CFG_PPEN_SHIFT);
-    *self->LDS = 0x0;
+    *self->LDS = 0x00;
     PWM1ERS = 0x0;
 }
 
@@ -63,20 +63,12 @@ void pwm_hw_disable(const struct pwm_hw* self){
    *self->CON &= ~(PWM_CON_EN_MASK);
 }
 
-void pwm_hw_enable_reload(const struct pwm_hw* self){
+void pwm_hw_enable_buffered(const struct pwm_hw* self){
    *self->CON |= PWM_CON_LD_MASK;
 }
 
-void pwm_hw_disable_reload(const struct pwm_hw* self){
+void pwm_hw_disable_buffered(const struct pwm_hw* self){
    *self->CON &= ~(PWM_CON_LD_MASK);
-}
-
-uint16_t pwm_hw_calculate_duty(uint16_t period, uint8_t percent) {
-    uint32_t temp = (uint32_t)(period + 1) * percent;
-    temp /= 100;
-    if (temp > period)
-        temp = period;
-    return (uint16_t)temp;
 }
 
 void pwm_set_period_common(const struct pwm_hw* self, uint16_t period){

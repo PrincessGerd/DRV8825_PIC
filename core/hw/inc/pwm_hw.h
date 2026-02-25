@@ -64,9 +64,8 @@ void pwm_hw_init(const struct pwm_hw* self, pwm_hw_config_t* config);
 void pwm_hw_clock_prescaler(const struct pwm_hw* self, uint8_t prescaler);
 void pwm_hw_enable(const struct pwm_hw* self);
 void pwm_hw_disable(const struct pwm_hw* self);
-void pwm_hw_enable_reload(const struct pwm_hw* self);
-void pwm_hw_disable_reload(const struct pwm_hw* self);
+void pwm_hw_enable_buffered(const struct pwm_hw* self);
+void pwm_hw_disable_buffered(const struct pwm_hw* self);
 void pwm_set_period_common(const struct pwm_hw* self, uint16_t period);
 void pwm_set_period_Px(const struct pwm_hw* self, pwmx_outputs_e px, uint16_t period);
-uint16_t pwm_hw_calculate_duty(uint16_t period, uint8_t percent);
 #endif

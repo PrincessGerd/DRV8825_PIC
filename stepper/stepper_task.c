@@ -8,7 +8,7 @@
 static const struct stepper_workEvt _drv8825_workEvt = {
     .accel = 128,
     .speed = 128,
-    .steps = 0xFFFFFE,
+    .steps = 0xFFFE,
     .super.signal = STEPPER_WORK_SIG
 };
 const struct stepper_initEvt* drv8825_workEvt = &_drv8825_workEvt;
