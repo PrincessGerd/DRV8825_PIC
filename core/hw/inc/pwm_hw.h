@@ -4,18 +4,18 @@
 #include <stdbool.h>
 
 typedef enum {
-    PWMx_CLK_CLC4_OUT     = 0xC,
-    PWMx_CLK_CLC3_OUT     = 0xB,
-    PWMx_CLK_CLC2_OUT     = 0xA,
-    PWMx_CLK_CLC1_OUT     = 0x9,
-    PWMx_CLK_CLKREF_OUT   = 0x8,
-    PWMx_CLK_EXTOSC       = 0x7,
-    PWMx_CLK_SOSC         = 0x6,
-    PWMx_CLK_MFINTOSC_32  = 0x5,
-    PWMx_CLK_MFINTOSC_500 = 0x4,
-    PWMx_CLK_LFINTOSC     = 0x3,
-    PWMx_CLK_HFINTOSC     = 0x2,
-    PWMx_CLK_FOSC         = 0x1,
+    PWMx_CLK_CLC4_OUT     = 0xD,
+    PWMx_CLK_CLC3_OUT     = 0xC,
+    PWMx_CLK_CLC2_OUT     = 0xB,
+    PWMx_CLK_CLC1_OUT     = 0xA,
+    PWMx_CLK_CLKREF_OUT   = 0x9,
+    PWMx_CLK_EXTOSC       = 0x8,
+    PWMx_CLK_SOSC         = 0x7,
+    PWMx_CLK_MFINTOSC_32  = 0x6,
+    PWMx_CLK_MFINTOSC_500 = 0x5,
+    PWMx_CLK_LFINTOSC     = 0x4,
+    PWMx_CLK_HFINTOSC     = 0x3,
+    PWMx_CLK_FOSC         = 0x2,
     PWMx_CLK_PPS1_SEL_OSC  = 0x1,
     PWMx_CLK_PPS0_SEL_OSC  = 0x0
 }pwmx_clk_src_e;
@@ -68,4 +68,5 @@ void pwm_hw_enable_reload(const struct pwm_hw* self);
 void pwm_hw_disable_reload(const struct pwm_hw* self);
 void pwm_set_period_common(const struct pwm_hw* self, uint16_t period);
 void pwm_set_period_Px(const struct pwm_hw* self, pwmx_outputs_e px, uint16_t period);
+uint16_t pwm_hw_calculate_duty(uint16_t period, uint8_t percent);
 #endif

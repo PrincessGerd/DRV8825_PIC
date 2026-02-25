@@ -381,12 +381,15 @@
 /*---------------------------------------------------------------------------------------*/
 #define PWM_BASE_ADDR       0x0151
 #define PWM_OFFSET_NEXT_MODULE  0x11
-
-#define PWM_CLK_OFFSET      0x4
-#define PWM_LDS_OFFSET      0x5
-#define PWM_PR_OFFSET       0x6
-#define PWM_CPRE_OFFSET     0x8
-#define PWM_PIPOS_OFFSET    0x9
+#define PWM_LOAD_OFFSET     0x0
+#define PWM_EN_OFFSET       0x1
+#define PWM_ERS_OFFSET      0x2
+#define PWM_CLK_OFFSET      0x3
+#define PWM_LDS_OFFSET      0x4
+#define PWM_PRL_OFFSET      0x5
+#define PWM_PRH_OFFSET      0x6
+#define PWM_CPRE_OFFSET     0x7
+#define PWM_PIPOS_OFFSET    0x8
 #define PWM_CON_OFFSET      0xB
 #define PWM_CFG_OFFSET      0xC
 #define PWM_SAP1_OFFSET     0xD

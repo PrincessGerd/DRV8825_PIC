@@ -5,6 +5,7 @@
 #include "../core/task_manager.h"
 #include "../core/gpio.h"
 #include "../core/system.h"
+#include "../core/interrupts.h"
 // hw
 #include "../core/hw/inc/dma_hw.h"
 #include "../core/hw/inc/pwm_hw.h"
@@ -25,9 +26,9 @@ static const dma_hw_config_t dma_config = {
 
 static const pwm_hw_config_t pwm_config = {
     .out1_polarity_low = false,
-    .out2_polarity_low = true,
+    .out2_polarity_low = false,
     .push_pull_mode = false,
-    .mode = PWMx_MODE_RIGHT_ALIGN,
+    .mode = PWMx_MODE_COMPARE_TOGGLE,
     .clk_src = PWMx_CLK_FOSC
 };
 
@@ -48,7 +49,8 @@ struct stepper{
     
     uint32_t stepps_remaining;
     uint32_t accel;
-    uint32_t v_sq;
+    uint16_t accel_delta;
+    uint16_t period;
 
     struct pwm_hw*      pwm_module;
     struct dma_hw*      dma_module;
@@ -71,12 +73,9 @@ static uint32_t julery_isqrt(uint32_t val) {
 }
 
 static void update_buffer(struct stepper* self){
+    self->accel_delta = self->accel_delta > 0 ? self->accel_delta - 1 : 1;
     while (self->count < RB_SIZE) {
-        uint32_t vel_sq = self->v_sq + (2 * self->accel);
-        self->v_sq = vel_sq;
-
-        uint32_t vel = julery_isqrt(vel_sq);
-        uint16_t period = vel;
+        uint16_t period = pwm_hw_calculate_duty(self->period,self->accel_delta);
 
         self->period_buffer[self->tail] = period;
         self->tail = mod((self->tail + 1), RB_SIZE);
@@ -110,16 +109,26 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     dma_hw_set_src(self->dma_module, (uint16_t)&self->period_buffer[0]);
     dma_hw_set_dst(self->dma_module, (uint16_t)&PWM1PR);
     dma_hw_set_startirq(self->dma_module, 0x5E); // pwm1sp1
-    pwm_set_period_common(self->pwm_module, self->period_buffer[0]);
+    gpio_set_direction(RC_4, IO_DIR_OUTPUT);
+    gpio_set_mode(RC_4, IO_MODE_DIGITAL);
+    INTCON0bits.GIE = 0; //Suspend interrupts
+    PPSLOCK = 0x55; //Required sequence
+    PPSLOCK = 0xAA; //Required sequence
+    PPSLOCKbits.PPSLOCKED = 0; //Set PPSLOCKED bit
+    INTCON0bits.GIE = 1; //Restore interrupts
+
+    RC4PPS = 0x07;
+
+    INTCON0bits.GIE = 0; //Suspend interrupts
+    PPSLOCK = 0x55; //Required sequence
+    PPSLOCK = 0xAA; //Required sequence
+    PPSLOCKbits.PPSLOCKED = 1; //Set PPSLOCKED bit
+    INTCON0bits.GIE = 1; //Restore interrupts
+
     self->head =0;
     self->tail =0;
     self->count = 0;
-}
-
-void __interrupt() isr(void){
-    if(...) { // pwm1 interrupt postscaled
-        task_event_consume(...)
-    }
+    self->accel_delta = 0;
 }
 
 static void stepper_dispatch(task_t* const super, event_t* const e){
@@ -127,8 +136,24 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
     switch (e->signal) {
         ////////////////////////////////////////////////////////
         case STEPPER_WORK_SIG:{
+            struct stepper_workEvt* event = (struct stepper_workEvt*)e;
+            self->accel = event->accel;
+            self->stepps_remaining = event->steps;
             update_buffer(self);
-            dma_hw_enable(self->dma_module);
+            pwm_hw_disable(self->pwm_module);
+            uint16_t test_per = pwm_hw_calculate_duty(1000,50);
+            pwm_set_period_common(self->pwm_module,test_per );
+            pwm_set_period_Px(self->pwm_module, PWMx_OUTPUT_P1, pwm_hw_calculate_duty(test_per,50));
+            interrupt_enable_priority();          
+            PIR4bits.PWM1PIF = 0;
+            PIR4bits.PWM1IF = 0;
+            PWM1GIRbits.S1P1IF = 0;
+            PWM1GIRbits.S1P2IF = 0;
+            PIE4bits.PWM1IE = 1;
+            PIE4bits.PWM1PIE = 1;
+            IPR4bits.PWM1IP = 1;
+            enable_global_interrupts();
+            //dma_hw_enable(self->dma_module);
             pwm_hw_enable(self->pwm_module);
             self->evt.signal = STEPPER_UPDATE_SIG;
             task_event_post(super,& self->evt);
