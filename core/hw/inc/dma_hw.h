@@ -30,9 +30,9 @@ void dma_hw_create(uint8_t module_num, const struct dma_hw ** dma_hw_inst_out);
 void dma_hw_init(const struct dma_hw* self, const dma_hw_config_t* config);
 void dma_hw_configure(
     const struct dma_hw* self,
-    uint16_t src,
+    uintptr_t src,
     uint16_t src_msg_size,
-    uint16_t dest,
+    uintptr_t dest,
     uint16_t dst_msg_size);
 
 void dma_hw_set_startirq(const struct dma_hw* self, uint8_t irq_num);

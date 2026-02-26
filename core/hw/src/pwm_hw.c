@@ -47,7 +47,7 @@ void pwm_hw_init(const struct pwm_hw* self, pwm_hw_config_t* config){
                     (config->out1_polarity_low << PWM_CFG_POL1_SHIFT) |
                     (config->out2_polarity_low << PWM_CFG_POL2_SHIFT) |
                     (config->push_pull_mode << PWM_CFG_PPEN_SHIFT);
-    *self->LDS = 0x00;
+    *self->LDS =0x7;
     PWM1ERS = 0x0;
 }
 

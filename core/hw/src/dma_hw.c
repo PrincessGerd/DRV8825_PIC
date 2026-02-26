@@ -26,9 +26,9 @@ void dma_hw_init(const struct dma_hw* self, const dma_hw_config_t* config){
 
 void dma_hw_configure(
     const struct dma_hw* self,
-    volatile uint16_t src,
+    uintptr_t src,
     uint16_t src_msg_size,
-    volatile uint16_t dest,
+    uintptr_t dest,
     uint16_t dst_msg_size){
     DMASELECT = self->module_num;
     DMAnSSA = src;
@@ -49,8 +49,8 @@ void dma_hw_set_abortirq(const struct dma_hw* self, uint8_t irq_num){
 
 void dma_hw_set_hwint(const struct dma_hw* self, bool start_trigg, bool abort_trigg){
     DMASELECT = self->module_num;
-    DMAnCON0bits.AIRQEN = start_trigg;
-    DMAnCON0bits.SIRQEN = abort_trigg;
+    DMAnCON0bits.AIRQEN = abort_trigg;
+    DMAnCON0bits.SIRQEN = start_trigg;
 }
 
 void dma_hw_enable(const struct dma_hw* self){

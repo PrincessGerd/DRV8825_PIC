@@ -15,25 +15,24 @@ int task_run(void) { // to prevent reset
     }
 }
 
-void __interrupt() isr(void){
-    if(PIR0bits.DMA1AIF == 1){
-        TRISCbits.TRISC7 = 0;
-        PIR0bits.DMA1AIF = 0;
+void __interrupt(high_priority) isr(void){
+    if(PIR0bits.DMA1DCNTIF == 1){
+    PIR0bits.DMA1DCNTIF = 0;
+    }
+    if(PIR0bits.DMA1SCNTIF == 1){
+        PIR0bits.DMA1SCNTIF = 0;
+        //TRISCbits.TRISC7 = 0;
         task_event_consume(AO_drv8825);
     }
-    
-    //if(PWM1GIRbits.S1P1IF == 1){
-    //    task_event_consume(AO_drv8825);
-    //}
+    if(PIR4bits.PWM1PIF == 1 || PIR4bits.PWM1IF == 1){
+        PIR4bits.PWM1PIF = 0;
+        PIR4bits.PWM1PIF = 0;
+        //TRISCbits.TRISC7 = 0;
+    }
 }
 
 extern task_t* AO_drv8825;
 int main(void) {
-    //PWM1_16BIT_Initialize();
-    INTCON0bits.GIEH    = 1;   /* Enables all high priority unmasked interrupts */
-    INTCON0bits.GIEL    = 1; 
-    INTCON0bits.GIE = 1;
-    //PWM1_16BIT_Enable();
     stepper_create(&AO_drv8825);
     static event_t* StpQueue[4];
     task_event_post(
@@ -47,10 +46,6 @@ int main(void) {
         &(drv8825_initEvt->super));
     AO_drv8825->dispatch(AO_drv8825,&drv8825_workEvt->super);
     task_event_post(AO_drv8825, &drv8825_workEvt->super);
-    PIR4bits.PWM1PIF = 1;
-    PIR4bits.PWM1IF = 1;
-    PIE4bits.PWM1PIE = 1;
-    PIE4bits.PWM1IE = 1;
     enable_global_interrupts();
     task_event_consume(AO_drv8825);
     return task_run();
