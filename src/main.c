@@ -18,13 +18,12 @@ int task_run(void) { // to prevent reset
 void __interrupt(high_priority) isr(void){
     if(PIR0bits.DMA1SCNTIF == 1){
         PIR0bits.DMA1SCNTIF = 0;
-        TRISCbits.TRISC7 = 0;
         task_event_consume(AO_drv8825);
+        TRISCbits.TRISC7 ^= 1;
     }
     if(PIR4bits.PWM1PIF == 1 || PIR4bits.PWM1IF == 1){
         PIR4bits.PWM1PIF = 0;
         PIR4bits.PWM1PIF = 0;
-        //TRISCbits.TRISC7 = 0;
     }
 }
 
