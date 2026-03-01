@@ -39,33 +39,19 @@ struct stepper{
     
     struct pwm_hw*      pwm_module;
     struct dma_hw*      dma_module;
-    
-    uint16_t c_n;
-    uint16_t curr_period;
+        
     uint32_t tick_frequency;
     uint16_t step_count;
     uint16_t accel_steps;
-
-    motion_states_e   motion_state;
-
-    volatile uint16_t steps_remaining;
-    volatile uint16_t buffer_index;
+    uint16_t max_step_freq;
+    uint16_t initial_step_freq;
+    uint16_t steps_remaining;
+    motion_states_e motion_state;
 };
 
 volatile uint16_t dma_buffer[BUFFER_SIZE];
 static void stepper_init(task_t* const super, event_t const* const ie);
 static void stepper_dispatch(task_t* const super, event_t* const e);
-
-typedef uint16_t(*next_period_func_t)(uint16_t* c_n, uint16_t* step_num);
-void fill_dma_buffer(struct stepper* self, next_period_func_t next_period) {
-    for(uint16_t i = 0; i < BUFFER_SIZE && self->steps_remaining > 0; i++) {
-        dma_buffer[i] = self->c_n;                        // write period for DMA
-        self->c_n = next_period(&self->c_n, &self->step_count);  // compute next step delay
-        self->curr_period = (uint16_t)(self->tick_frequency / self->c_n);   // compute next period
-        self->step_count++;
-        self->steps_remaining--;
-    }
-}
 
 void stepper_create(task_t** self){
     static struct stepper stepper_inst;
@@ -83,8 +69,8 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     struct stepper_initEvt* initial_event = (struct stepper_initEvt*)ie;
     (*(self->device))->init(self->device, &initial_event->pins);
     pwm_hw_init(self->pwm_module,&pwm_config);
-    pwm_hw_clock_prescaler(self->pwm_module, 128);
-    self->tick_frequency = 64000000/128;
+    pwm_hw_clock_prescaler(self->pwm_module, 32); // period of 1/2Mhz
+    self->tick_frequency = 64000000/32;
     dma_hw_configure(
         self->dma_module,           //
         DMA_MEM_SFR_GPR_SEL,        // ram
@@ -104,6 +90,7 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     dma_hw_set_arbiter_prio(self->dma_module, 1);   // this is reqired for dma to start
     PIR0bits.DMA1SCNTIF = 0;                 // Clear interrupt flag
     PIE0bits.DMA1SCNTIE = 1;                 // Enable source count done interrupt
+
     gpio_set_direction(RC_4, IO_DIR_OUTPUT);
     gpio_set_mode(RC_4, IO_MODE_DIGITAL);
     INTCON0bits.GIE = 0; //Suspend interrupts
@@ -121,31 +108,59 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     INTCON0bits.GIE = 1; //Restore interrupts
 }
 
-// shit code. havent made the algorithm yet
-uint16_t next_period_accel(uint16_t* c_n, uint16_t* step_num){
-    // c_{n+1} = c_n - (2c_n)/(4n+1)
-    // T_{n+1} = f_tick/c_{n+1}
-    // AVR446 example 
-    uint32_t cn = *c_n;
-    uint32_t n  = *step_num;
-    uint32_t delta = (cn << 1) / ((n << 2) + 1);
-    cn -= delta;
-    *c_n =  (*c_n-128) < 255 ? 255 : *c_n - 128; //(uint16_t)delta;
-    return *c_n;
+
+uint16_t test = 0xFFFF;
+typedef uint16_t(*next_period_func_t)(struct stepper* self);
+void fill_dma_buffer(struct stepper* self, next_period_func_t next_period) {
+    for(uint16_t i = 0; i < BUFFER_SIZE && self->steps_remaining > 0; i++) {
+        dma_buffer[i] = next_period(self);  // compute next step period
+        self->step_count++;
+        self->steps_remaining--;
+    }
 }
 
-uint16_t next_period_const(uint16_t* c_n, uint16_t* step_num){
-    (void)step_num;
-    return *c_n;
+#define Q16_BITS 16
+#define Q16_ONE (1 << Q16_BITS)
+
+typedef uint32_t fp16_t;
+fp16_t fp_mul(fp16_t a, fp16_t b){
+    return ((a * b) >> Q16_BITS);
 }
 
-uint16_t next_period_deccel(uint16_t* c_n, uint16_t* step_num){
-    uint32_t cn = *c_n;
-    uint32_t n  = *step_num;
-    uint32_t delta = (cn << 1) / ((n << 2) + 1);
-    cn += delta;
-    *c_n = (uint16_t)delta;
-    return *c_n;
+fp16_t fp_div(fp16_t a, fp16_t b){
+    return ((a << Q16_BITS) / b);
+}
+
+
+// -2s^3 + 3s^2
+static inline uint32_t smoothstep_cubic(uint32_t s) {
+    fp16_t s2 = fp_mul(s,s);
+    return fp_mul(s2, (3 << Q16_BITS) - fp_mul((2<<Q16_BITS), s));
+}
+
+uint16_t next_period_accel(struct stepper* self) {
+    fp16_t s = (self->step_count * Q16_ONE) / self->accel_steps;
+    fp16_t scale = smoothstep_cubic(s);
+    fp16_t delta_f = (self->max_step_freq - self->initial_step_freq) << Q16_BITS;
+    uint32_t freq = self->initial_step_freq + (fp_mul(delta_f , scale)  >> 16);
+    // Convert frequency to timer period
+    uint32_t period = self->tick_frequency / freq;
+    return (uint16_t)period;
+}
+
+uint16_t next_period_const(struct stepper* self){
+    uint32_t period = self->tick_frequency / self->max_step_freq; 
+    return (uint16_t)period;
+}
+
+uint16_t next_period_deccel(struct stepper* self){
+    uint32_t s = (self->steps_remaining * Q16_ONE) / self->accel_steps;
+    fp16_t scale = smoothstep_cubic(s);
+    fp16_t delta_f = (self->max_step_freq - self->initial_step_freq) << Q16_BITS;
+    uint32_t freq = self->initial_step_freq + (fp_mul(delta_f , scale)  >> 16);
+    // Convert frequency to timer period
+    uint32_t period = self->tick_frequency / freq;
+    return (uint16_t)period;
 }
 
 static void stepper_dispatch(task_t* const super, event_t* const e){
@@ -154,10 +169,11 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         ////////////////////////////////////////////////////////
         case STEPPER_WORK_SIG:{
             struct stepper_workEvt* event = (struct stepper_workEvt*)e;
-            self->steps_remaining = 0xFFFE;//event->steps;
-            self->c_n = 0xFFFE;
-            self->step_count = 0;
-            self->accel_steps = 0x0FFE;
+            self->steps_remaining = 0xFFFE; //event->steps;
+            self->accel_steps = self->steps_remaining >> 2; // steps required for acceleration
+            self->initial_step_freq = 200;                  // start speed   (steps/tick)
+            self->max_step_freq = 15000;                     // desired speed (steps/tick)
+            self->step_count = 0;                           // 
             fill_dma_buffer(self,&next_period_accel);
             pwm_set_period_common(self->pwm_module, dma_buffer[0]);
             pwm_hw_enable_buffered(self->pwm_module);
@@ -208,14 +224,14 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                     TRISCbits.TRISC7 = 0;
                     return;
             }
-            // rearm the dma with new data
+            // re-arm the dma with new data
             dma_hw_arm(
                 self->dma_module,
                 0x26,
-                dma_buffer,  // source ptr
-                BUFFER_SIZE*2,         // source message size
-                &PWM1PRL,   // destination ptr
-                2                      // destination msg size
+                dma_buffer,     // source ptr
+                BUFFER_SIZE*2,  // source message size
+                &PWM1PRL,       // destination ptr
+                2               // destination msg size
             );
         } break;
         ////////////////////////////////////////////////////////
