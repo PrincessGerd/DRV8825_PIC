@@ -108,59 +108,62 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     INTCON0bits.GIE = 1; //Restore interrupts
 }
 
+// helper functions for fixedpoint 
+#define Q15_BITS 15
+#define Q15_ONE (1 << Q15_BITS)
+typedef uint16_t fp15_t;
 
-uint16_t test = 0xFFFF;
-typedef uint16_t(*next_period_func_t)(struct stepper* self);
-void fill_dma_buffer(struct stepper* self, next_period_func_t next_period) {
-    for(uint16_t i = 0; i < BUFFER_SIZE && self->steps_remaining > 0; i++) {
-        dma_buffer[i] = next_period(self);  // compute next step period
-        self->step_count++;
-        self->steps_remaining--;
-    }
+static inline fp15_t fp_mul(fp15_t a, fp15_t b){
+    return ((uint32_t)a * b) >> Q15_BITS;
 }
 
-#define Q16_BITS 16
-#define Q16_ONE (1 << Q16_BITS)
-
-typedef uint32_t fp16_t;
-fp16_t fp_mul(fp16_t a, fp16_t b){
-    return ((a * b) >> Q16_BITS);
+static inline fp15_t fp_div(fp15_t a, fp15_t b){
+    return (((uint32_t)a << Q15_BITS) / b);
 }
-
-fp16_t fp_div(fp16_t a, fp16_t b){
-    return ((a << Q16_BITS) / b);
-}
-
-
 // -2s^3 + 3s^2
-static inline uint32_t smoothstep_cubic(uint32_t s) {
-    fp16_t s2 = fp_mul(s,s);
-    return fp_mul(s2, (3 << Q16_BITS) - fp_mul((2<<Q16_BITS), s));
+static inline fp15_t smoothstep_cubic(fp15_t s) {
+    fp15_t s2 = fp_mul(s,s);
+    fp15_t c1 = 3 * Q15_ONE;
+    fp15_t c2 = fp_mul((2u *Q15_ONE), s);
+    return fp_mul(s2, (c1 - c2));
 }
 
-uint16_t next_period_accel(struct stepper* self) {
-    fp16_t s = (self->step_count * Q16_ONE) / self->accel_steps;
-    fp16_t scale = smoothstep_cubic(s);
-    fp16_t delta_f = (self->max_step_freq - self->initial_step_freq) << Q16_BITS;
-    uint32_t freq = self->initial_step_freq + (fp_mul(delta_f , scale)  >> 16);
+static uint16_t next_period_accel(struct stepper* self) {
+    fp15_t s = ((uint32_t)self->step_count << Q15_BITS) / self->accel_steps;
+    if (s > Q15_ONE) s = Q15_ONE;
+    fp15_t scale = smoothstep_cubic(s);
+    uint32_t delta_f = self->max_step_freq - self->initial_step_freq;
+    uint32_t freq  = self->initial_step_freq + ((delta_f * scale) >> 16);
     // Convert frequency to timer period
-    uint32_t period = self->tick_frequency / freq;
+    uint32_t period = (self->tick_frequency / freq);
     return (uint16_t)period;
 }
 
-uint16_t next_period_const(struct stepper* self){
+static uint16_t next_period_const(struct stepper* self){
     uint32_t period = self->tick_frequency / self->max_step_freq; 
     return (uint16_t)period;
 }
 
-uint16_t next_period_deccel(struct stepper* self){
-    uint32_t s = (self->steps_remaining * Q16_ONE) / self->accel_steps;
-    fp16_t scale = smoothstep_cubic(s);
-    fp16_t delta_f = (self->max_step_freq - self->initial_step_freq) << Q16_BITS;
-    uint32_t freq = self->initial_step_freq + (fp_mul(delta_f , scale)  >> 16);
+static uint16_t next_period_deccel(struct stepper* self){
+    fp15_t s = ((uint32_t)self->steps_remaining << Q15_BITS) / self->accel_steps;
+    if (s > Q15_ONE) s = Q15_ONE;
+    fp15_t scale = smoothstep_cubic(s);
+    uint32_t delta_f = self->max_step_freq - self->initial_step_freq;
+    uint32_t freq  = self->initial_step_freq + ((delta_f * scale)  >> 16);
     // Convert frequency to timer period
-    uint32_t period = self->tick_frequency / freq;
+    uint32_t period = (self->tick_frequency / freq);
     return (uint16_t)period;
+}
+
+typedef uint16_t(*next_period_func_t)(struct stepper* self);
+static void fill_dma_buffer(struct stepper* self, next_period_func_t next_period) {
+    uint16_t p = 0;
+    for(uint16_t i = 0; i < BUFFER_SIZE && self->steps_remaining > 0; i++) {
+        p = next_period(self);
+        dma_buffer[i] = p;  // compute next step period
+        self->step_count++;
+        self->steps_remaining--;
+    }
 }
 
 static void stepper_dispatch(task_t* const super, event_t* const e){
@@ -169,10 +172,10 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         ////////////////////////////////////////////////////////
         case STEPPER_WORK_SIG:{
             struct stepper_workEvt* event = (struct stepper_workEvt*)e;
-            self->steps_remaining = 0xFFFE; //event->steps;
-            self->accel_steps = self->steps_remaining >> 2; // steps required for acceleration
+            self->steps_remaining = 20000;//0xFFFE; //event->steps;
+            self->accel_steps = (self->steps_remaining >> 2); // steps required for acceleration
             self->initial_step_freq = 200;                  // start speed   (steps/tick)
-            self->max_step_freq = 15000;                     // desired speed (steps/tick)
+            self->max_step_freq = 4000;                     // desired speed (steps/tick)
             self->step_count = 0;                           // 
             fill_dma_buffer(self,&next_period_accel);
             pwm_set_period_common(self->pwm_module, dma_buffer[0]);
@@ -236,11 +239,11 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         } break;
         ////////////////////////////////////////////////////////
         case DRIVER_FAULT_SIG:{
-
+            // TODO: do fault handling
         }break;
         ////////////////////////////////////////////////////////
         case STEPPER_IDLE_SIG:{
-
+            // TODO: consider removing this. seems unessecary
         }break;
         ////////////////////////////////////////////////////////
         case STEPPER_DONE_SIG:{
