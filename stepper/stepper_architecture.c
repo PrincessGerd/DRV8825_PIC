@@ -24,14 +24,14 @@ static const pwm_hw_config_t pwm_config = {
 };
 
 typedef enum{
-    STEPPER_STATE_ACCELERATE,
+    STEPPER_STATE_ACCELERATE = 0,
     STEPPER_STATE_CONSTANT_SPEED,
     STEPPER_STATE_DEACCELERATE,
     STEPPER_STATE_IDLE
 }motion_states_e;
 
 #define BUFFER_SIZE 32
-
+#define MAX_ACCEL_STEPS 0x5FF
 struct stepper{
     task_t              super;
     event_t             evt;
@@ -39,14 +39,16 @@ struct stepper{
     
     struct pwm_hw*      pwm_module;
     struct dma_hw*      dma_module;
-        
+
     uint32_t tick_frequency;
-    uint16_t step_count;
+    uint32_t steps_remaining;
+    uint32_t step_count;
+
     uint16_t accel_steps;
-    uint16_t max_step_freq;
-    uint16_t initial_step_freq;
-    uint16_t steps_remaining;
+    uint16_t max_period;
+    uint16_t initial_period;
     motion_states_e motion_state;
+    bool is_working;
 };
 
 volatile uint16_t dma_buffer[BUFFER_SIZE];
@@ -68,6 +70,7 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     struct stepper* self = container_of(super, struct stepper, super); 
     struct stepper_initEvt* initial_event = (struct stepper_initEvt*)ie;
     (*(self->device))->init(self->device, &initial_event->pins);
+    self->is_working = false;
     pwm_hw_init(self->pwm_module,&pwm_config);
     pwm_hw_clock_prescaler(self->pwm_module, 32); // period of 1/2Mhz
     self->tick_frequency = 64000000/32;
@@ -100,7 +103,7 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     INTCON0bits.GIE = 1; //Restore interrupts
 
     RC4PPS = 0x07;
-
+    //RC3PPS = 0x08;
     INTCON0bits.GIE = 0; //Suspend interrupts
     PPSLOCK = 0x55; //Required sequence
     PPSLOCK = 0xAA; //Required sequence
@@ -132,35 +135,28 @@ static uint16_t next_period_accel(struct stepper* self) {
     fp15_t s = ((uint32_t)self->step_count << Q15_BITS) / self->accel_steps;
     if (s > Q15_ONE) s = Q15_ONE;
     fp15_t scale = smoothstep_cubic(s);
-    uint32_t delta_f = self->max_step_freq - self->initial_step_freq;
-    uint32_t freq  = self->initial_step_freq + ((delta_f * scale) >> 16);
-    // Convert frequency to timer period
-    uint32_t period = (self->tick_frequency / freq);
+    uint32_t delta_f = self->initial_period - self->max_period;
+    uint32_t period  = self->initial_period - ((delta_f * scale) >> 16);
     return (uint16_t)period;
 }
 
 static uint16_t next_period_const(struct stepper* self){
-    uint32_t period = self->tick_frequency / self->max_step_freq; 
-    return (uint16_t)period;
+    return (uint16_t)self->max_period;
 }
 
 static uint16_t next_period_deccel(struct stepper* self){
     fp15_t s = ((uint32_t)self->steps_remaining << Q15_BITS) / self->accel_steps;
     if (s > Q15_ONE) s = Q15_ONE;
     fp15_t scale = smoothstep_cubic(s);
-    uint32_t delta_f = self->max_step_freq - self->initial_step_freq;
-    uint32_t freq  = self->initial_step_freq + ((delta_f * scale)  >> 16);
-    // Convert frequency to timer period
-    uint32_t period = (self->tick_frequency / freq);
+    uint32_t delta_f = self->initial_period - self->max_period;
+    uint32_t period  = self->initial_period - ((delta_f * scale) >> 16);
     return (uint16_t)period;
 }
 
 typedef uint16_t(*next_period_func_t)(struct stepper* self);
 static void fill_dma_buffer(struct stepper* self, next_period_func_t next_period) {
-    uint16_t p = 0;
     for(uint16_t i = 0; i < BUFFER_SIZE && self->steps_remaining > 0; i++) {
-        p = next_period(self);
-        dma_buffer[i] = p;  // compute next step period
+        dma_buffer[i] = next_period(self);  // compute next step period
         self->step_count++;
         self->steps_remaining--;
     }
@@ -172,17 +168,18 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         ////////////////////////////////////////////////////////
         case STEPPER_WORK_SIG:{
             struct stepper_workEvt* event = (struct stepper_workEvt*)e;
-            self->steps_remaining = 20000;//0xFFFE; //event->steps;
-            self->accel_steps = (self->steps_remaining >> 2); // steps required for acceleration
-            self->initial_step_freq = 200;                  // start speed   (steps/tick)
-            self->max_step_freq = 4000;                     // desired speed (steps/tick)
-            self->step_count = 0;                           // 
+            self->steps_remaining = 0xFFFE;//event->steps;
+            self->accel_steps    = (self->steps_remaining >> 2) > MAX_ACCEL_STEPS ? MAX_ACCEL_STEPS : (self->steps_remaining >> 2);// steps required for acceleration
+            self->initial_period = (uint16_t)(self->tick_frequency / event->start_speed); // desired speed (steps/tick)    
+            self->max_period     = (uint16_t)(self->tick_frequency / event->desired_speed);  // start speed   (steps/tick) 
+            self->step_count     = 0;                                // 
             fill_dma_buffer(self,&next_period_accel);
             pwm_set_period_common(self->pwm_module, dma_buffer[0]);
             pwm_hw_enable_buffered(self->pwm_module);
             self->motion_state = STEPPER_STATE_ACCELERATE;
             self->evt.signal = STEPPER_UPDATE_SIG;
             task_event_post(super, &self->evt);
+            self->is_working = true;
 
             PWM1GIRbits.S1P1IF = 0;
             PWM1GIEbits.S1P1IE = 1;
@@ -196,7 +193,7 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         ////////////////////////////////////////////////////////
         case STEPPER_UPDATE_SIG:{
             switch (self->motion_state) {
-                case STEPPER_STATE_ACCELERATE:
+                case STEPPER_STATE_ACCELERATE:{
                     if(self->step_count < self->accel_steps){
                         fill_dma_buffer(self,&next_period_accel);
                     }else{
@@ -204,8 +201,8 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                         self->evt.signal = STEPPER_UPDATE_SIG;   
                     }
                     task_event_post(super,&self->evt);
-                    break;
-                case STEPPER_STATE_CONSTANT_SPEED:
+                }break;
+                case STEPPER_STATE_CONSTANT_SPEED:{
                     if(self->steps_remaining > self->accel_steps){
                         fill_dma_buffer(self, &next_period_const);
                     }else{
@@ -213,8 +210,8 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                         self->evt.signal = STEPPER_UPDATE_SIG;   
                     }
                     task_event_post(super,& self->evt);
-                break;
-                case STEPPER_STATE_DEACCELERATE:
+                }break;
+                case STEPPER_STATE_DEACCELERATE:{
                     if(self->steps_remaining > 0){
                         fill_dma_buffer(self, &next_period_deccel);
                     } else{
@@ -222,9 +219,8 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                         self->evt.signal = STEPPER_DONE_SIG;   
                     }
                     task_event_post(super,&self->evt);
-                break;
-                default:    // default case
-                    TRISCbits.TRISC7 = 0;
+                }break;
+                default:    // IDLE case
                     return;
             }
             // re-arm the dma with new data
@@ -239,23 +235,25 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         } break;
         ////////////////////////////////////////////////////////
         case DRIVER_FAULT_SIG:{
-            // TODO: do fault handling
-        }break;
-        ////////////////////////////////////////////////////////
-        case STEPPER_IDLE_SIG:{
-            // TODO: consider removing this. seems unessecary
+            ////gpio(self->device.)
+            //pwm_hw_disable(self->pwm_module);
+            ////// no feedback to fix problem. exit.
+            ////// TODO: make a closed loop system instead
+            //self->evt.signal = STEPPER_DONE_SIG;
+            //task_event_post(super,&self->evt);
+            //stepper_dispatch(super,&self->evt); // imediate dispatch. no trigger left
         }break;
         ////////////////////////////////////////////////////////
         case STEPPER_DONE_SIG:{
-            TRISCbits.TRISC7 = 0;
             pwm_hw_disable(self->pwm_module);
             dma_hw_disable(self->dma_module);
             pwm_set_period_Px(self->pwm_module,PWMx_OUTPUT_P1,0xFFFF);
             self->steps_remaining = 0;
+            self->is_working = false;
             // post .. to notify toplayer of done
         }break;
 
-    default:
+    default: // IDLE, do nothing
         break;
     }
     return;

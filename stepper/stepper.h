@@ -25,9 +25,9 @@ enum signals{
 };
 typedef struct stepper_workEvt{
     event_t     super;
-    uint16_t    steps;
-    uint16_t    speed;
-    uint16_t    accel; 
+    uint32_t    steps;
+    uint16_t    start_speed;
+    uint16_t    desired_speed; 
 }stepper_workEvt_t;
 
 typedef struct stepper_initEvt{
@@ -40,5 +40,3 @@ static task_t* AO_drv8825;
 
 void stepper_create(task_t** self);
 #endif	/* STEPPER_H*/
-
-

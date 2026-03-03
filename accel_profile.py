@@ -10,22 +10,22 @@ timer_clock   = 2_000_000  # Hz
 curve_freq = np.zeros(total_steps, dtype=int)
 
 def fp_mul(a: int, b: int):
-    return (a * b) >> 16
+    return (a * b) >> 15
 
 def fp_div(a: int, b: int):
     if b == 0:
         return 0
-    return (a << 16) // b
+    return (a << 15) // b
 
 def smoothstep_qubic(x: int):
-    # x in Q16
-    return fp_mul(x, (3<<16) - fp_mul(2<<16, x))
+    # x in Q15
+    return fp_mul(x, (3<<15) - fp_mul(2<<15, x))
 
 # -------- ACCELERATION --------
 for i in range(accel_steps):
-    s = (i * (1<<16)) // accel_steps
+    s = (i * (1<<15)) // accel_steps
     scale = smoothstep_qubic(s)
-    freq = f_start + (fp_mul((f_max - f_start)<<16, scale) >> 16)
+    freq = f_start + (fp_mul((f_max - f_start)<<15, scale) >> 15)
     curve_freq[i] = timer_clock // freq
 
 # -------- CONSTANT SPEED --------
@@ -34,9 +34,9 @@ for i in range(accel_steps, total_steps - accel_steps):
 
 # -------- DECELERATION --------
 for i in range(total_steps - accel_steps, total_steps):
-    s = ((total_steps - i) * (1<<16)) // accel_steps
+    s = ((total_steps - i) * (1<<15)) // accel_steps
     scale = smoothstep_qubic(s)
-    freq = f_start +( fp_mul((f_max - f_start)<<16, scale) >> 16)
+    freq = f_start +( fp_mul((f_max - f_start)<<15, scale) >> 15)
     curve_freq[i] = timer_clock // freq
 
 plt.plot(curve_freq)
