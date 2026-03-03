@@ -146,7 +146,6 @@ typedef struct {
 /*---------------------------------------------------------------------------------------*/
 struct timer2x_hw;
 typedef void (*timer2_callback_t)(const struct timer2x_hw* self);
-
 void create_timer2x(const struct timer2x_hw **timer2x_hw_inst_out, uint8_t module_num);
 void timer2x_init(const struct timer2x_hw* self, timer_config_t* config);
 void timer2x_enable(const struct timer2x_hw* self);
@@ -154,5 +153,5 @@ void timer2x_disable(const struct timer2x_hw* self);
 void timer2x_clear(const struct timer2x_hw* self);
 void timer2x_set_period(const struct timer2x_hw* self, uint8_t period);
 void timer2x_read_counter(const struct timer2x_hw* self, uint8_t* count);
-
+void timer2x_set_prescaler(const struct timer2x_hw* self, timer_prescaler_e prescaler);
 #endif

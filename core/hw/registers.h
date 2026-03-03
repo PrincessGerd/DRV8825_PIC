@@ -18,6 +18,7 @@
     (((*(reg)) & (mask)) >> (shift))
 
     //TODO: update the old definitons to the new form. looks like shit tbh
+        // switch this whole ting out with the xc.h definitions
 /*---------------------------------------------------------------------------------------*/
 /*PIE and PIR ---------------------------------------------------------------------------*/
 /*---------------------------------------------------------------------------------------*/
@@ -374,4 +375,43 @@
 #define CLC_GLS_G1D3T_MASK        BIT(CLC_GLS_G1D3T_SHIFT)
 #define CLC_GLS_G1D4N_MASK        BIT(CLC_GLS_G1D4N_SHIFT)
 #define CLC_GLS_G1D4T_MASK        BIT(CLC_GLS_G1D4T_SHIFT)
+
+/*---------------------------------------------------------------------------------------*/
+/*PWMx-----------------------------------------------------------------------------------*/
+/*---------------------------------------------------------------------------------------*/
+#define PWM_BASE_ADDR       0x0151
+#define PWM_OFFSET_NEXT_MODULE  0x11
+#define PWM_LOAD_OFFSET     0x0
+#define PWM_EN_OFFSET       0x1
+#define PWM_ERS_OFFSET      0x2
+#define PWM_CLK_OFFSET      0x3
+#define PWM_LDS_OFFSET      0x4
+#define PWM_PRL_OFFSET      0x5
+#define PWM_PRH_OFFSET      0x6
+#define PWM_CPRE_OFFSET     0x7
+#define PWM_PIPOS_OFFSET    0x8
+#define PWM_CON_OFFSET      0xB
+#define PWM_CFG_OFFSET      0xC
+#define PWM_SAP1_OFFSET     0xD
+#define PWM_SAP2_OFFSET     0xE
+
+#define PWM_CON_EN_SHIFT        0x7
+#define PWM_CON_LD_SHIFT        0x2
+#define PWM_CON_ERSPOL_SHIFT    0x1
+#define PWM_CON_ERSNOW_SHIFT    0x0
+
+#define PWM_CON_EN_MASK      BIT(PWM_CON_EN_SHIFT)
+#define PWM_CON_LD_MASK      BIT(PWM_CON_LD_SHIFT)
+#define PWM_CON_ERSPOL_MASK  BIT(PWM_CON_ERSPOL_SHIFT)
+#define PWM_CON_ERSNOW_MASK  BIT(PWM_CON_ERSNOW_SHIFT)
+
+#define PWM_CFG_POL1_SHIFT      0x7
+#define PWM_CFG_POL2_SHIFT      0x6
+#define PWM_CFG_PPEN_SHIFT      0x3
+#define PWM_CFG_MODE_SHIFT      0x0
+
+#define PWM_CFG_POL1_MASK      BIT(PWM_CFG_POL1_SHIFT)
+#define PWM_CFG_POL2_MASK      BIT(PWM_CFG_POL2_SHIFT)
+#define PWM_CFG_PPEN_MASK      BIT(PWM_CFG_PPEN_SHIFT)
+#define PWM_CFG_MODE_MASK      FIELD(3,PWM_CFG_MODE_SHIFT)
 #endif // REGISTERS_H

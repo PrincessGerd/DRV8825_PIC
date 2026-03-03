@@ -73,11 +73,12 @@ typedef struct {
 
 
 struct timer1_hw;
-void timer1_init(const struct timer1_hw* self, tmr1_config_t* config);
-void timer1_enable(const struct timer1_hw* self);
-void timer1_disable(const struct timer1_hw* self);
-void timer1_read_counter(const struct timer1_hw* self, uint16_t* count);
-void timer1_set_counter(const struct timer1_hw* self, uint16_t value);
-
+void timer1_create(struct timer1_hw const** timer1_hw_inst_out);
+void timer1_init(struct timer1_hw* const self, tmr1_config_t* config);
+void timer1_enable(struct timer1_hw* const self);
+void timer1_disable(struct timer1_hw* const self);
+void timer1_read_counter(struct timer1_hw* const self, uint16_t* count);
+void timer1_set_counter(struct timer1_hw* const self, uint16_t value);
+void timer1_set_prescaler(struct timer1_hw* const self, uint8_t prescaler);
 #endif	/* TIMER16BIT_H */
 
