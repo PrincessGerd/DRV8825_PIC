@@ -1,3 +1,4 @@
-# Interface for stepper motor driver drv8825 using a pic18f16q20
-Currently a work in progress
-<img width="1030" height="613" alt="Screenshot 2026-02-11 at 15-56-48 Untitled Diagram drawio - draw io" src="https://github.com/user-attachments/assets/edb69458-0a0e-4203-ae63-bd91980788d7" />
+### Interface for stepper motor driver drv8825 using a pic18f16q20
+#### Currently a work in progress
+Initial design idea for using PWM and DMA for generating pulses with acceleration profile.
+<img width="1614" height="883" alt="Screenshot 2026-03-03 at 16-32-41 stepper(1) drawio - draw io" src="https://github.com/user-attachments/assets/8e17d4dc-fc1d-4024-878f-deb5fee83586" />
