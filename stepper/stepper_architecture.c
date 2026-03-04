@@ -39,7 +39,8 @@ struct stepper{
     
     struct pwm_hw*      pwm_module;
     struct dma_hw*      dma_module;
-
+    uint16_t*           period_buffer;
+    bool swap;
     uint32_t tick_frequency;
     uint32_t steps_remaining;
     uint32_t step_count;
@@ -50,13 +51,13 @@ struct stepper{
     motion_states_e motion_state;
     bool is_working;
 };
-
-volatile uint16_t dma_buffer[BUFFER_SIZE];
 static void stepper_init(task_t* const super, event_t const* const ie);
 static void stepper_dispatch(task_t* const super, event_t* const e);
 
 void stepper_create(task_t** self){
     static struct stepper stepper_inst;
+    static uint16_t _fill_buffer[BUFFER_SIZE * 2];  // memory for buffer 2xBuffersize, first BUFFER_SIZE as period_buffer, other as swap
+    stepper_inst.period_buffer = _fill_buffer;      // buffer1[0 -> 31], buffer2[32 -> 63]
     create_stepper_device(&stepper_inst.device);
     pwm_hw_create(0,&stepper_inst.pwm_module);
     dma_hw_create(0,&stepper_inst.dma_module);
@@ -85,7 +86,7 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     dma_hw_arm(
         self->dma_module,
         0x26,
-        dma_buffer,     // source ptr
+        self->period_buffer,     // source ptr
         BUFFER_SIZE*2,  // source message size
         &PWM1PRL,       // destination ptr
         2               // destination msg size
@@ -156,7 +157,7 @@ static uint16_t next_period_deccel(struct stepper* self){
 typedef uint16_t(*next_period_func_t)(struct stepper* self);
 static void fill_dma_buffer(struct stepper* self, next_period_func_t next_period) {
     for(uint16_t i = 0; i < BUFFER_SIZE && self->steps_remaining > 0; i++) {
-        dma_buffer[i] = next_period(self);  // compute next step period
+        self->period_buffer[(BUFFER_SIZE*self->swap)+i] = next_period(self);  // compute next step period
         self->step_count++;
         self->steps_remaining--;
     }
@@ -173,8 +174,11 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             self->initial_period = (uint16_t)(self->tick_frequency / event->start_speed); // desired speed (steps/tick)    
             self->max_period     = (uint16_t)(self->tick_frequency / event->desired_speed);  // start speed   (steps/tick) 
             self->step_count     = 0;                                // 
+            fill_dma_buffer(self,&next_period_accel); // fill both buffers 
+            self->swap = !self->swap;
             fill_dma_buffer(self,&next_period_accel);
-            pwm_set_period_common(self->pwm_module, dma_buffer[0]);
+            self->swap = !self->swap;
+            pwm_set_period_common(self->pwm_module, self->period_buffer[0]);
             pwm_hw_enable_buffered(self->pwm_module);
             self->motion_state = STEPPER_STATE_ACCELERATE;
             self->evt.signal = STEPPER_UPDATE_SIG;
@@ -192,6 +196,15 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         } break;
         ////////////////////////////////////////////////////////
         case STEPPER_UPDATE_SIG:{
+            // re-arm the dma with swapped buffer data
+            dma_hw_arm(
+                self->dma_module,
+                0x26,
+                (self->period_buffer + self->swap*(BUFFER_SIZE*2)),// source ptr
+                BUFFER_SIZE*2,  // source message size
+                &PWM1PRL,       // destination ptr
+                2               // destination msg size
+            );
             switch (self->motion_state) {
                 case STEPPER_STATE_ACCELERATE:{
                     if(self->step_count < self->accel_steps){
@@ -223,15 +236,6 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                 default:    // IDLE case
                     return;
             }
-            // re-arm the dma with new data
-            dma_hw_arm(
-                self->dma_module,
-                0x26,
-                dma_buffer,     // source ptr
-                BUFFER_SIZE*2,  // source message size
-                &PWM1PRL,       // destination ptr
-                2               // destination msg size
-            );
         } break;
         ////////////////////////////////////////////////////////
         case DRIVER_FAULT_SIG:{
