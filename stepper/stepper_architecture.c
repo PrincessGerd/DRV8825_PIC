@@ -156,8 +156,9 @@ static uint16_t next_period_deccel(struct stepper* self){
 
 typedef uint16_t(*next_period_func_t)(struct stepper* self);
 static void fill_dma_buffer(struct stepper* self, next_period_func_t next_period) {
+    uint8_t start_idx = (BUFFER_SIZE*self->swap);
     for(uint16_t i = 0; i < BUFFER_SIZE && self->steps_remaining > 0; i++) {
-        self->period_buffer[(BUFFER_SIZE*self->swap)+i] = next_period(self);  // compute next step period
+        self->period_buffer[start_idx+i] = next_period(self);  // compute next step period
         self->step_count++;
         self->steps_remaining--;
     }
@@ -197,14 +198,16 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         ////////////////////////////////////////////////////////
         case STEPPER_UPDATE_SIG:{
             // re-arm the dma with swapped buffer data
+            uint8_t start_idx = self->swap*BUFFER_SIZE;
             dma_hw_arm(
                 self->dma_module,
                 0x26,
-                (self->period_buffer + self->swap*(BUFFER_SIZE*2)),// source ptr
+                &self->period_buffer[start_idx],// source ptr
                 BUFFER_SIZE*2,  // source message size
                 &PWM1PRL,       // destination ptr
                 2               // destination msg size
             );
+            self->swap = !self->swap;
             switch (self->motion_state) {
                 case STEPPER_STATE_ACCELERATE:{
                     if(self->step_count < self->accel_steps){
