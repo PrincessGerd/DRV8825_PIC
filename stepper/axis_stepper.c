@@ -20,7 +20,7 @@ typedef struct axis_stepper{
     event_t evt;
     uint32_t steps_remaining;
     uint32_t step_count;
-    fp15_t        n;  // normalised scaler
+    fp15_t   n;  // normalised scaler
 
     struct dma_hw* dma;
     struct pwm_hw* pwm;
@@ -52,9 +52,9 @@ static void arm_dma(const axis_stepper_t* self){
     dma_hw_arm(
         self->dma,
         0x26 + (2*self->module_num),// irq trigger PWM1
-        self->buffer[self->active_buffer], // source ptr
+        &self->buffer[self->active_buffer][0], // source ptr
         BUFFER_SIZE*2,          // source message size
-        period_regs[self->module_num],    // destination ptr
+        &PWM1PRL,    // destination ptr
         2                     // destination msg size
     );
 }
@@ -92,7 +92,7 @@ void axis_stepper_start_move(
         self->steps_remaining = steps;
         for(int i = 0; i < BUFFER_SIZE; i++){
             self->buffer[0][i] = (period[i] * self->n) >> Q15_BITS;
-            self->buffer[1][i] = (period[i] * self->n) >> Q15_BITS;
+            self->buffer[1][i] = (128*i * self->n) >> Q15_BITS;
         }
         arm_dma(self);  // arm dma with first buffer
         pwm_set_period_common(self->pwm, self->buffer[self->active_buffer][0]);
