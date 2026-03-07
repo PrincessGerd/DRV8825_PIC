@@ -37,9 +37,9 @@ void dma_hw_configure(
 void dma_hw_arm(
     const struct dma_hw* self, 
     uint8_t trigger, 
-    void* src_addr,
+    uint24_t src_addr,
     uint16_t src_len,
-    void* dest_addr,
+    uint24_t dest_addr,
     uint16_t dest_len);
 
 void dma_hw_set_arbiter_prio(

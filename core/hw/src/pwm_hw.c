@@ -47,8 +47,12 @@ void pwm_hw_init(const struct pwm_hw* self, pwm_hw_config_t* config){
                     (config->out1_polarity_low << PWM_CFG_POL1_SHIFT) |
                     (config->out2_polarity_low << PWM_CFG_POL2_SHIFT) |
                     (config->push_pull_mode << PWM_CFG_PPEN_SHIFT);
-    *self->LDS = 0x7;
+    *self->LDS = 0x0;
     PWM1ERS = 0x0;
+}
+
+void pwm_hw_set_lds(const struct pwm_hw* self, uint8_t lds){
+    *self->LDS = lds;
 }
 
 void pwm_hw_clock_prescaler(const struct pwm_hw* self, uint8_t prescaler){

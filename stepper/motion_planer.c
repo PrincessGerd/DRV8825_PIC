@@ -6,6 +6,7 @@
 #include "../core/task_manager.h"
 #include "../core/system.h"
 #include "../core/interrupts.h"
+#include "../core/dma_descriptor.h"
 //
 #include "../inc/math.h"
 #include <stdint.h>
@@ -39,8 +40,9 @@ struct motion_planer{
     struct motion_profile profile;
     struct axis_stepper_t* axis_x;
     struct axis_stepper_t* axis_y;
+    fp15_t nx;
+    fp15_t ny;
     uint32_t tick_frequency;
-    uint16_t period_buffer[BUFFER_SIZE];
 };
 
 
@@ -61,7 +63,7 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     struct motion_planer* self = container_of(super, struct motion_planer, super); 
     struct stepper_initEvt* initial_event = (struct stepper_initEvt*)ie;
     axis_stepper_init(self->axis_x);    
-    axis_stepper_init(self->axis_y);    
+    axis_stepper_init(self->axis_y); 
     self->tick_frequency = 64000000/32; // ie->tick_frequency;
 }
 
@@ -77,7 +79,7 @@ static uint16_t next_period_accel(struct motion_profile* mp) {
     fp15_t s = ((uint32_t)mp->step_count << Q15_BITS) / mp->accel_steps;
     if (s > Q15_ONE) s = Q15_ONE;
     fp15_t scale = smoothstep_cubic(s);
-    uint32_t period  = mp->min_period - ((mp->delta * scale) >> Q15_BITS);
+    uint32_t period  = mp->max_period - ((mp->delta * scale) >> Q15_BITS);
     return (uint16_t)period;
 }
 
@@ -89,18 +91,19 @@ static uint16_t next_period_deccel(struct motion_profile* mp){
     fp15_t s = ((uint32_t)(mp->total_steps - mp->step_count) << Q15_BITS) / mp->accel_steps;
     if (s > Q15_ONE) s = Q15_ONE;
     fp15_t scale = smoothstep_cubic(s);
-    uint32_t period  = mp->min_period - ((mp->delta * scale) >> Q15_BITS);
+    uint32_t period  = mp->max_period - ((mp->delta * scale) >> Q15_BITS);
     return (uint16_t)period;
 }
 typedef uint16_t(*next_period_func_t)(struct motion_profile* mp);
 static void refill_stepper(struct motion_planer* self, next_period_func_t next_period){
-    uint16_t period;
-    for(int i = 0; i < BUFFER_SIZE; i++){
-        self->period_buffer[i] = next_period(&self->profile);
+    uint16_t* bx = axis_stepper_get_fill_buffer(self->axis_x);
+    uint16_t* by = axis_stepper_get_fill_buffer(self->axis_y);
+    for(int i = 0; i < BUFFER_SIZE; i++) {
+        uint16_t p = next_period(&self->profile);
+        bx[i] = (p * self->nx) >> Q15_BITS;
+        by[i] = (p * self->ny) >> Q15_BITS;
+        self->profile.step_count++;
     }
-    axis_stepper_fill_buffer(self->axis_x, self->period_buffer);
-    axis_stepper_fill_buffer(self->axis_y, self->period_buffer);
-    self->profile.step_count += BUFFER_SIZE;
 }
 
 static void stepper_dispatch(task_t* const super, event_t* const e){
@@ -111,29 +114,26 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             struct stepper_workEvt* event = (struct stepper_workEvt*)e;
             uint32_t dx = event->steps_x;   // steps in y axis
             uint32_t dy = event->steps_y;   // steps in x axis
-            uint16_t mag = isqrt16(dx*dx + dy*dy);
-            fp15_t nx = fp_div((dx << Q15_BITS), mag); // calculate normal for x 
-            fp15_t ny = fp_div((dy << Q15_BITS), mag); // calculate normal for y
+            uint32_t mag = 15000; //isqrt32(dx*dx + dy*dy);
+            self->nx = fp_div((dx << Q15_BITS), mag); // calculate normal for x 
+            self->ny = fp_div((dy << Q15_BITS), mag); // calculate normal for y
 
-            self->profile.total_steps    = mag;
             self->profile.step_count     = 0;
+            self->profile.total_steps    = mag;
             self->profile.accel_steps    = (self->profile.total_steps >> 2) > 
                                             MAX_ACCEL_STEPS ? MAX_ACCEL_STEPS : (self->profile.total_steps >> 2); // steps required for acceleration
             self->profile.min_period     = (uint16_t)(self->tick_frequency / event->desired_speed);        // desired speed (steps/tick)    
-            self->profile.max_period     = (uint16_t)(self->tick_frequency / 0xFFE);                  // start speed   (steps/tick) 
+            self->profile.max_period     = (uint16_t)(self->tick_frequency / 200);                  // start speed   (steps/tick) 
             self->profile.motion_state   = ACCELERATE;
-            self->profile.delta = self->profile.min_period - self->profile.max_period;
-            refill_stepper(self,&next_period_accel);            
-            axis_stepper_start_move(self->axis_x,mag,nx,self->period_buffer);
-            axis_stepper_start_move(self->axis_y,mag,ny,self->period_buffer);
+            self->profile.delta = self->profile.max_period - self->profile.min_period;
+            //refill_stepper(self,&next_period_accel);            
+            axis_stepper_start_move(self->axis_x,dx);
+            axis_stepper_start_move(self->axis_y,dy);
             self->evt.signal = STEPPER_UPDATE_SIG;   
             task_event_post(super,&self->evt);
-            
         } break;
         ////////////////////////////////////////////////////////
         case STEPPER_UPDATE_SIG:{
-            TRISCbits.TRISC7 ^= 1;
-
             switch (self->profile.motion_state) {
                 case ACCELERATE:{
                     if(self->profile.step_count < self->profile.accel_steps){
@@ -159,8 +159,8 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                     } else{
                         self->profile.motion_state = IDLE;
                         self->evt.signal = STEPPER_DONE_SIG;   
-                        task_event_post(super,&self->evt);
                     }
+                    task_event_post(super,&self->evt);
                 }break;
                 default:    // IDLE case
                     return;
@@ -168,6 +168,7 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         } break;
         ////////////////////////////////////////////////////////
         case STEPPER_DONE_SIG:{
+            TRISCbits.TRISC7 = 1;
         }break;
 
     default: // IDLE, do nothing

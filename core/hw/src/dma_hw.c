@@ -31,15 +31,15 @@ void dma_hw_configure(
 void dma_hw_arm(
     const struct dma_hw* self, 
     uint8_t trigger, 
-    void* src_addr,
+    uint24_t src_addr,
     uint16_t src_len,
-    void* dest_addr,
+    uint24_t dest_addr,
     uint16_t dest_len)
 {
     DMASELECT = self->module_num;
 
-    DMAnSSA = (uint24_t)src_addr;
-    DMAnDSA = (uint16_t)dest_addr;
+    DMAnSSA = src_addr;
+    DMAnDSA = dest_addr;
     DMAnSSZ = src_len;
     DMAnDSZ = dest_len;
     DMAnSIRQ  = trigger;
