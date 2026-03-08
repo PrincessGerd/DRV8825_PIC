@@ -4,6 +4,4 @@ Initial design idea for using PWM and DMA for generating pulses with acceleratio
 <img width="1614" height="883" alt="Screenshot 2026-03-03 at 16-32-41 stepper(1) drawio - draw io" src="https://github.com/user-attachments/assets/8e17d4dc-fc1d-4024-878f-deb5fee83586" />
 ### Next step
 -Adding support for swapping for period buffer
-
 -Attempt to utilize both pwm outputs on the same module
-<img width="1587" height="1069" alt="Screenshot 2026-03-03 at 23-47-10 stepper(1) drawio - draw io" src="https://github.com/user-attachments/assets/83119d61-811a-43b9-8b4c-cd3e5bf0aec7" />
