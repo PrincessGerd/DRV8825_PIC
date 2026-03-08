@@ -1,3 +1,3 @@
 # Interface for stepper motor driver drv8825 using a pic18f16q20
 Currently a work in progress
-<img width="1030" height="613" alt="Screenshot 2026-02-11 at 15-56-48 Untitled Diagram drawio - draw io" src="https://github.com/user-attachments/assets/edb69458-0a0e-4203-ae63-bd91980788d7" />
+<img width="1808" height="1278" alt="Screenshot 2026-03-08 at 20-26-28 Untitled Diagram - Untitled Diagram drawio pdf" src="https://github.com/user-attachments/assets/4f7ba3ab-0e9f-44cc-9707-e7f9f500e39e" />
