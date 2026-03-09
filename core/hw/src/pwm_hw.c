@@ -51,6 +51,10 @@ void pwm_hw_init(const struct pwm_hw* self, pwm_hw_config_t* config){
     PWM1ERS = 0x0;
 }
 
+void pwm_hw_masked_enable(uint8_t mask){
+    *((volatile uint8_t*)(PWM_BASE_ADDR + PWM_EN_OFFSET)) = mask;
+}
+
 void pwm_hw_set_lds(const struct pwm_hw* self, uint8_t lds){
     *self->LDS = lds;
 }

@@ -17,31 +17,24 @@ int task_run(void) { // to prevent reset
 
 extern task_t* AO_drv8825;
 int main(void) {
-    PWM1GIRbits.S1P1IF = 0;
-    PWM1GIEbits.S1P1IE = 1;
-    PWM2GIRbits.S1P1IF = 0;
-    PWM2GIEbits.S1P1IE = 1;
+    //PWM1GIRbits.S1P1IF = 0;
+    //PWM1GIEbits.S1P1IE = 1;
+    //PWM2GIRbits.S1P1IF = 0;
+    //PWM2GIEbits.S1P1IE = 1;
 
     PIR0bits.DMA1SCNTIF = 0;                 // Clear interrupt flag
     PIE0bits.DMA1SCNTIE = 1;                 // Enable source count done interrupt
-    //PIR5bits.PWM2IF = 0;
-    //PIR5bits.PWM2PIF = 0;
-    //PIE5bits.PWM2IE = 1;
-    //PIE5bits.PWM2PIE = 1;
-    //PIR1bits.DMA2SCNTIF = 0;                 // Clear interrupt flag
-    //PIE1bits.DMA2SCNTIE = 1;                 // Enable source count done interrupt
     gpio_set_direction(RC_4, IO_DIR_OUTPUT);
     gpio_set_mode(RC_4, IO_MODE_DIGITAL);
-    gpio_set_direction(RC_5, IO_DIR_OUTPUT);
-    gpio_set_mode(RC_5, IO_MODE_DIGITAL);
+    gpio_set_direction(RC_3, IO_DIR_OUTPUT);
+    gpio_set_mode(RC_3, IO_MODE_DIGITAL);
     INTCON0bits.GIE = 0; //Suspend interrupts
     PPSLOCK = 0x55; //Required sequence
     PPSLOCK = 0xAA; //Required sequence
     PPSLOCKbits.PPSLOCKED = 0; //Set PPSLOCKED bit
     INTCON0bits.GIE = 1; //Restore interrupts
     RC4PPS = 0x07;
-    RC5PPS = 0x0A;
-    //RC3PPS = 0x08;
+    RC3PPS = 0x08;
     INTCON0bits.GIE = 0; //Suspend interrupts
     PPSLOCK = 0x55; //Required sequence
     PPSLOCK = 0xAA; //Required sequence
@@ -62,5 +55,9 @@ int main(void) {
     task_event_post(AO_drv8825, &drv8825_workEvt->super);
     enable_global_interrupts();
     task_event_consume(AO_drv8825);
+    //struct axis_stepper* step;
+    //axis_stepper_instance(&step,0,0);
+    //axis_stepper_init(step,2);
+    //axis_stepper_start_move(step,2000);
     return task_run();
 }

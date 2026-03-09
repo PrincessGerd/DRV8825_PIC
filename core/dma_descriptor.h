@@ -21,12 +21,11 @@ typedef struct dma_descriptor_handle {
 void dma_descriptor_setup(
     struct dma_descriptor_handle* handle, 
     struct dma_hw* dma, 
-    dma_descriptor_t* const desc,
     uint8_t trigger);
-
+void dma_descriptor_start(struct dma_descriptor_handle* handle);
 void dma_descriptor_enqueue(
     struct dma_descriptor_handle* handle,
-    dma_descriptor_t* const desc);
+    dma_descriptor_t* desc);
 
 void dma_descriptor_dispatch(struct dma_descriptor_handle* handle);
 

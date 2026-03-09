@@ -38,10 +38,10 @@ struct motion_planer{
     task_t super;
     event_t evt;
     struct motion_profile profile;
-    struct axis_stepper_t* axis_x;
-    struct axis_stepper_t* axis_y;
+    struct axis_stepper_t* axes;
     fp15_t nx;
     fp15_t ny;
+    uint8_t axis_count;
     uint32_t tick_frequency;
 };
 
@@ -51,8 +51,7 @@ static void stepper_dispatch(task_t* const super, event_t* const e);
 
 void stepper_create(task_t** self){
     static struct motion_planer mp_inst;
-    axis_stepper_instance(&mp_inst.axis_x, &mp_inst.super,0);
-    axis_stepper_instance(&mp_inst.axis_y, &mp_inst.super,1);
+    axis_stepper_instance(&mp_inst.axes, &mp_inst.super,0);
     task_create(&mp_inst.super,
         (event_handler_t)&stepper_init,
         (event_handler_t)&stepper_dispatch);
@@ -62,8 +61,7 @@ void stepper_create(task_t** self){
 static void stepper_init(task_t* const super, event_t const* const ie){
     struct motion_planer* self = container_of(super, struct motion_planer, super); 
     struct stepper_initEvt* initial_event = (struct stepper_initEvt*)ie;
-    axis_stepper_init(self->axis_x);    
-    axis_stepper_init(self->axis_y); 
+    axis_stepper_init(self->axes, 2);//self->axis_count);    
     self->tick_frequency = 64000000/32; // ie->tick_frequency;
 }
 
@@ -96,12 +94,11 @@ static uint16_t next_period_deccel(struct motion_profile* mp){
 }
 typedef uint16_t(*next_period_func_t)(struct motion_profile* mp);
 static void refill_stepper(struct motion_planer* self, next_period_func_t next_period){
-    uint16_t* bx = axis_stepper_get_fill_buffer(self->axis_x);
-    uint16_t* by = axis_stepper_get_fill_buffer(self->axis_y);
+    uint16_t* buffer = axis_stepper_get_fill_buffer(self->axes);
     for(int i = 0; i < BUFFER_SIZE; i++) {
         uint16_t p = next_period(&self->profile);
-        bx[i] = (p * self->nx) >> Q15_BITS;
-        by[i] = (p * self->ny) >> Q15_BITS;
+        buffer[i] = (p * self->nx) >> Q15_BITS;
+        buffer[i+1] = (p * self->ny) >> Q15_BITS;
         self->profile.step_count++;
     }
 }
@@ -126,9 +123,8 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             self->profile.max_period     = (uint16_t)(self->tick_frequency / 200);                  // start speed   (steps/tick) 
             self->profile.motion_state   = ACCELERATE;
             self->profile.delta = self->profile.max_period - self->profile.min_period;
-            //refill_stepper(self,&next_period_accel);            
-            axis_stepper_start_move(self->axis_x,dx);
-            axis_stepper_start_move(self->axis_y,dy);
+            refill_stepper(self,&next_period_accel);            
+            axis_stepper_start_move(self->axes,mag);
             self->evt.signal = STEPPER_UPDATE_SIG;   
             task_event_post(super,&self->evt);
         } break;

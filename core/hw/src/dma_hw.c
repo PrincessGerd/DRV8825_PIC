@@ -37,7 +37,6 @@ void dma_hw_arm(
     uint16_t dest_len)
 {
     DMASELECT = self->module_num;
-
     DMAnSSA = src_addr;
     DMAnDSA = dest_addr;
     DMAnSSZ = src_len;
