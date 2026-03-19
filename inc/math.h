@@ -5,7 +5,7 @@
 ///////////////////////////////////////////////
 // FIXED POINT
 ///////////////////////////////////////////////
-#define Q15_BITS 15u
+#define Q15_BITS 14u // 14 fractional bits, one sign
 #define Q15_ONE (1u << Q15_BITS)
 typedef uint16_t fp15_t;
 static inline fp15_t fp_mul(fp15_t a, fp15_t b){

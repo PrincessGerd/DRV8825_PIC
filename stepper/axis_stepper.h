@@ -9,18 +9,25 @@
 
 #define MAX_AXES 4
 
-#define BUFFER_SIZE 32
+#define AXIS_STEPPER_BUFFER_SIZE 32
 #define NUM_DESCRIPTORS 2
-#define NUM_AXES 3
+
+typedef union __attribute__((packed, aligned(4))) uv{
+    struct{
+        uint16_t u;
+        uint16_t v;
+    } axis;
+    uint16_t uv[2];
+} uv_t;
 
 struct axis_stepper;
-uint16_t* axis_stepper_get_fill_buffer(struct axis_stepper* self);
+uv_t* axis_stepper_get_fill_buffer(struct axis_stepper* self);
 void axis_stepper_instance(struct axis_stepper** inst_out, task_t* const owner, uint8_t module_num);
 void axis_stepper_init(
     struct axis_stepper* const self, 
     uint8_t axis_count);
 void axis_stepper_start_move(
     struct axis_stepper* self,
-    uint32_t steps  // steps in current axis
+    uint32_t steps // steps in dominant axis
 );  
 #endif

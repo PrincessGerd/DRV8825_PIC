@@ -9,45 +9,131 @@
 #include "../core/dma_descriptor.h"
 //
 #include "../inc/math.h"
+#include "../inc/vector.h"
+#include "../inc/cordic.h"
 #include <stdint.h>
 #include <stdbool.h>
 #include <xc.h>
 
-typedef enum{
-    ACCELERATE = 0,
-    CONSTANT_SPEED,
-    DEACCELERATE,
-    IDLE
-}motion_states_e;
-
-#define BUFFER_SIZE 32
-#define MAX_ACCEL_STEPS 0x5FF
-
-struct motion_profile {
-    uint32_t total_steps;
-    uint32_t accel_steps;
-    uint32_t step_count;
-
-    uint16_t min_period;
-    uint16_t max_period;
-    uint16_t delta;
-    motion_states_e motion_state;
-};
-
+#define MOVEMENT_BUFER_SIZE 512;
+#define CMD_BUFFER_LEN 16;
 struct motion_planer{
     task_t super;
     event_t evt;
-    struct motion_profile profile;
-    struct axis_stepper_t* axes;
-    fp15_t nx;
-    fp15_t ny;
-    uint8_t axis_count;
     uint32_t tick_frequency;
+    struct axis_stepper_t* axes;
+    uint8_t axis_count;
+    uint8_t active;
+
+    uint8_t head;
+    uint8_t tail;
 };
 
+typedef enum {
+    G_ARC_CW = 0,
+    G_ARC_CCW,
+    G_LINE,
+    G_DWELL
+} gcode_cmd_t;
+
+struct move_cmd{
+    gcode_cmd_t cmd;
+    int16_t[4] data;
+};
+
+static uv_t movement_buffer[MOVEMENT_BUFER_SIZE];
+static struct move_cmd cmd_buffer[CMD_BUFFER_LEN];
 
 static void stepper_init(task_t* const super, event_t const* const ie);
 static void stepper_dispatch(task_t* const super, event_t* const e);
+
+void gcode_line(
+    int16_t U[2], 
+    int16_t X, int16_t Y) {
+        
+    int16_t x0 = U[0];
+    int16_t y0 = U[1];
+    int16_t dx = (X > x0) ? (X - x0) : (x0 - X);
+    int16_t dy = (Y > y0) ? (Y - y0) : (y0 - Y);
+    int16_t sx = (x0 < X) ? 1 : -1;
+    int16_t sy = (y0 < Y) ? 1 : -1;
+
+    int16_t err = dx - dy;
+
+    while (true) {
+        printf("%d,%d\n", x0, y0);
+        if (x0 == X && y0 == Y)
+            break;
+        int16_t e2 = (err << 1);
+        if (e2 > -dy) {
+            err -= dy;
+            x0 += sx;
+        }
+        if (e2 < dx) {
+            err += dx;
+            y0 += sy;
+        }
+    }
+}
+
+void gcode_arc(int16_t u[2],
+  int16_t X, int16_t Y,
+  int16_t I, int16_t J,
+  bool clockwise,
+  uint16_t step = 1) {
+    int32_t v[2] = {X, Y};
+    int32_t c[2] = {u[0]+I, u[1]+J};
+ 
+    int32_t umc[2] = {(u[0] - c[0]), (u[1] - c[1])};
+    int32_t vmc[2] = {(v[0] - c[0]), (v[1] - c[1])};
+ 
+    int16_t r;
+    cordic_hypot(umc[0], umc[1], &r);
+    r = r < 0 ? -r : r;
+
+    int32_t sin_theta = (umc[0]*vmc[1] - umc[1]*vmc[0]); // cross
+    int32_t cos_theta = (umc[0]*vmc[0] + umc[1]*vmc[1]); // dot
+    fp15_t theta; // total angle between start and end positions
+    cordic_atan2(sin_theta, cos_theta, &theta);
+ 
+    if (clockwise)
+        theta = -theta;
+    if (theta < 0)
+        theta += FP_ONE;
+ 
+    int32_t arc_len = mul_i32_q15(r,theta);
+    int32_t steps = max(1, arc_len);
+    int32_t segments = (steps % 31) + 1;
+    fp15_t dtheta = (theta / (steps > 31 ? 31 : steps));
+ 
+    // basis vectors
+    // second bais is perpendicular to e1
+    int16_t su[2] = {fp15_div(umc[0],r), fp15_div(umc[1],r)};
+    int32_t e1[2] = {su[0], su[1]};
+    int32_t e2[2] = {-e1[1], e1[0]};
+    if (clockwise) {
+        e2[0] =  e1[1];
+        e2[1] = -e1[0];
+    }
+    //printf("r =%d | theta = %d | arc_len = %d\n",r, theta, arc_len);
+    fp15_t dcos=0, dsin=0;
+    cordic_sincos(dtheta,&dcos,&dsin);
+    int32_t x = -mul_i32_q15(r,dcos); // initial condition is [r,0];
+    int32_t y = -mul_i32_q15(r,dsin); // [x,y] * [[cos(theta) - sin(theta)],[sin(theta) + cos(theta)]];
+    //printf("dtheta = %d,cos = %d | sin = %d\n",dtheta,dcos,dsin);
+    // breakes down when recalculating, so removed. still breaks for large stepping segments
+    // do to drift.
+    // TODO : add recalculation
+    for(int i = 0; i < steps; i++){
+        int32_t px = (c[0] + x * e1[0] + y * e2[0]) >> FP_SHIFT;
+        int32_t py = (c[1] + x * e1[1] + y * e2[1]) >> FP_SHIFT;
+        int32_t x_new = mul_i32_q15(x,dsin) + mul_i32_q15(y,dcos);
+        int32_t y_new = mul_i32_q15(x,dcos) - mul_i32_q15(y,dsin);
+        x = x_new;
+        y = y_new;
+        printf("%d,%d,%d\n", px, py, 0);
+    }
+}
 
 void stepper_create(task_t** self){
     static struct motion_planer mp_inst;
@@ -61,113 +147,44 @@ void stepper_create(task_t** self){
 static void stepper_init(task_t* const super, event_t const* const ie){
     struct motion_planer* self = container_of(super, struct motion_planer, super); 
     struct stepper_initEvt* initial_event = (struct stepper_initEvt*)ie;
-    axis_stepper_init(self->axes, 2);//self->axis_count);    
+    self->axis_count = initial_event.axes;
     self->tick_frequency = 64000000/32; // ie->tick_frequency;
-}
-
-// -2s^3 + 3s^2
-static inline fp15_t smoothstep_cubic(fp15_t s) {
-    fp15_t s2 = fp_mul(s,s);
-    fp15_t c1 = 3 * Q15_ONE;
-    fp15_t c2 = fp_mul((2u *Q15_ONE), s);
-    return fp_mul(s2, (c1 - c2));
-}
-
-static uint16_t next_period_accel(struct motion_profile* mp) {
-    fp15_t s = ((uint32_t)mp->step_count << Q15_BITS) / mp->accel_steps;
-    if (s > Q15_ONE) s = Q15_ONE;
-    fp15_t scale = smoothstep_cubic(s);
-    uint32_t period  = mp->max_period - ((mp->delta * scale) >> Q15_BITS);
-    return (uint16_t)period;
-}
-
-static uint16_t next_period_const(struct motion_profile* mp){
-    return (uint16_t)mp->max_period;
-}
-
-static uint16_t next_period_deccel(struct motion_profile* mp){
-    fp15_t s = ((uint32_t)(mp->total_steps - mp->step_count) << Q15_BITS) / mp->accel_steps;
-    if (s > Q15_ONE) s = Q15_ONE;
-    fp15_t scale = smoothstep_cubic(s);
-    uint32_t period  = mp->max_period - ((mp->delta * scale) >> Q15_BITS);
-    return (uint16_t)period;
-}
-typedef uint16_t(*next_period_func_t)(struct motion_profile* mp);
-static void refill_stepper(struct motion_planer* self, next_period_func_t next_period){
-    uint16_t* buffer = axis_stepper_get_fill_buffer(self->axes);
-    for(int i = 0; i < BUFFER_SIZE; i++) {
-        uint16_t p = next_period(&self->profile);
-        buffer[i] = (p * self->nx) >> Q15_BITS;
-        buffer[i+1] = (p * self->ny) >> Q15_BITS;
-        self->profile.step_count++;
-    }
+    self->active = 0;
+    axis_stepper_init(self->axes, self->axis_count);    
 }
 
 static void stepper_dispatch(task_t* const super, event_t* const e){
     struct motion_planer* self = container_of(super, struct motion_planer, super); 
     switch (e->signal) {
         ////////////////////////////////////////////////////////
-        case STEPPER_WORK_SIG:{
+        case EV_WORK_SIG:{
             struct stepper_workEvt* event = (struct stepper_workEvt*)e;
             uint32_t dx = event->steps_x;   // steps in y axis
             uint32_t dy = event->steps_y;   // steps in x axis
-            uint32_t mag = 15000; //isqrt32(dx*dx + dy*dy);
-            self->nx = fp_div((dx << Q15_BITS), mag); // calculate normal for x 
-            self->ny = fp_div((dy << Q15_BITS), mag); // calculate normal for y
-
-            self->profile.step_count     = 0;
-            self->profile.total_steps    = mag;
-            self->profile.accel_steps    = (self->profile.total_steps >> 2) > 
-                                            MAX_ACCEL_STEPS ? MAX_ACCEL_STEPS : (self->profile.total_steps >> 2); // steps required for acceleration
-            self->profile.min_period     = (uint16_t)(self->tick_frequency / event->desired_speed);        // desired speed (steps/tick)    
-            self->profile.max_period     = (uint16_t)(self->tick_frequency / 200);                  // start speed   (steps/tick) 
-            self->profile.motion_state   = ACCELERATE;
-            self->profile.delta = self->profile.max_period - self->profile.min_period;
-            refill_stepper(self,&next_period_accel);            
+            
             axis_stepper_start_move(self->axes,mag);
-            self->evt.signal = STEPPER_UPDATE_SIG;   
+            self->evt.signal = EV_BUFFER_FILL_SIG;   
             task_event_post(super,&self->evt);
         } break;
         ////////////////////////////////////////////////////////
-        case STEPPER_UPDATE_SIG:{
-            switch (self->profile.motion_state) {
-                case ACCELERATE:{
-                    if(self->profile.step_count < self->profile.accel_steps){
-                        refill_stepper(self, &next_period_accel);
-                    }else{
-                        self->profile.motion_state = CONSTANT_SPEED;
-                        self->evt.signal = STEPPER_UPDATE_SIG;   
-                        task_event_post(super,&self->evt);
-                    }
-                }break;
-                case CONSTANT_SPEED:{
-                    if((self->profile.total_steps - self->profile.step_count) > self->profile.accel_steps){
-                        refill_stepper(self, &next_period_const);
-                    }else{
-                        self->profile.motion_state = DEACCELERATE;
-                        self->evt.signal = STEPPER_UPDATE_SIG;   
-                        task_event_post(super,& self->evt);
-                    }
-                }break;
-                case DEACCELERATE:{
-                    if((self->profile.total_steps - self->profile.step_count) > 0){
-                        refill_stepper(self, &next_period_deccel);
-                    } else{
-                        self->profile.motion_state = IDLE;
-                        self->evt.signal = STEPPER_DONE_SIG;   
-                    }
-                    task_event_post(super,&self->evt);
-                }break;
-                default:    // IDLE case
-                    return;
+        case EV_BUFFER_FILL_SIG:{
+            uv_t* fill;
+            fill = axis_stepper_get_fill_buffer(self->axes);
+            for(int i = 0; i < MOVEMENT_BUFER_SIZE; i++){
+                fill[i] = movement_buffer[i];
             }
+
+
         } break;
         ////////////////////////////////////////////////////////
-        case STEPPER_DONE_SIG:{
+        case EV_DONE_SIG:{
             TRISCbits.TRISC7 = 1;
         }break;
+        ////////////////////////////////////////////////////////
+        case EV_IDLE_SIG: {
 
-    default: // IDLE, do nothing
+        }break;
+    default:
         break;
     }
     return;

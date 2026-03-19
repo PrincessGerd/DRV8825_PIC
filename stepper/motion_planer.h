@@ -9,11 +9,10 @@ extern const struct stepper_initEvt* drv8825_workEvt;
 extern const struct stepper_initEvt* drv8825_initEvt;
 
 enum motion_planer_signals{
-    STEPPER_IDLE_SIG = 0,
-    STEPPER_WORK_SIG = 1,
-    STEPPER_DONE_SIG = 2,
-    STEPPER_UPDATE_SIG = 3,
-    DRIVER_FAULT_SIG = 4
+    EV_IDLE_SIG,
+    EV_WORK_SIG,
+    EV_DONE_SIG,
+    EV_BUFFER_FILL_SIG
 };
 typedef struct stepper_workEvt{
     event_t     super;
