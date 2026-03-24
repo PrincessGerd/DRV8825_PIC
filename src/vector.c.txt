@@ -1,0 +1,120 @@
+#include "../inc/vector.h"
+
+ #define FP_BITS 15U
+#define FP_ONE (1U << FP_BITS)
+typedef int16_t fp15_t; 
+
+typedef struct{
+    fp15_t x, y, z;
+} vec_t;
+
+vec_t vec_add(vec_t u, vec_t v){
+    vec_t res = {u.x + v.x, u.y + v.y, u.z + v.z};
+    return res;
+}
+
+vec_t vec_sub(vec_t u, vec_t v){
+    vec_t res = {u.x - v.x, u.y - v.y, u.z - v.z};
+    return res;
+}
+
+vec_t vec_mul(vec_t u, fp15_t s){
+    vec_t res = {        
+        fp_mul(u.x, s),
+        fp_mul(u.y, s),
+        fp_mul(u.z, s)
+    };
+    return res;
+}
+
+vec_t vec_div(vec_t u, fp15_t s){
+    vec_t res = {
+        fp_div(u.x, s),
+        fp_div(u.y, s),
+        fp_div(u.z, s)
+    };
+    return res;
+}
+
+vec_t vec_cross(vec_t u, vec_t v){
+    vec_t res = {
+        fp_mul(u.y, v.z) - fp_mul(u.z, u.y),
+        fp_mul(u.z, v.x) - fp_mul(u.z, u.x),
+        fp_mul(u.x, v.y) - fp_mul(u.y, u.x)
+    };
+    return res;
+}
+
+fp15_t vec_dot(vec_t u, vec_t v) {
+    return fp_mul(u.x,v.x) + fp_mul(u.y, v.y) + fp_mul(u.z, v.z);
+}
+
+fp15_t vec_norm(vec_t u){
+    uint32_t tmp = vec_dot(u,u);
+    fp15_t res = (fp15_t)isqrt32(tmp);
+    return res;
+}
+
+vec_t vec_normalise(vec_t u){
+    fp15_t norm = vec_norm(u);
+    if(norm == 0) return u;
+    return vec_div(u,norm);
+}
+
+
+void gcode_arc(int16_t* u[2],
+  int16_t X, int16_t Y,
+  int16_t I, int16_t J,
+  bool clockwise) {
+    int32_t v[2] = {X, Y};
+    int32_t c[2] = {(*u[0])+I, (*u[1])+J};
+ 
+    int32_t umc[2] = {((*u[0]) - c[0]), ((*u[1]) - c[1])};
+    int32_t vmc[2] = {(v[0] - c[0]), (v[1] - c[1])};
+ 
+    int16_t r;
+    cordic_hypot(umc[0], umc[1], &r);
+    r = r < 0 ? -r : r;
+
+    int32_t sin_theta = (umc[0]*vmc[1] - umc[1]*vmc[0]); // cross
+    int32_t cos_theta = (umc[0]*vmc[0] + umc[1]*vmc[1]); // dot
+    fp15_t theta; // total angle between start and end positions
+    cordic_atan2(sin_theta, cos_theta, &theta);
+ 
+    if (clockwise)
+        theta = -theta;
+    if (theta < 0)
+        theta += Q15_ONE;
+ 
+    int32_t arc_len = mul_i32_q15(r,theta);
+    int32_t steps = max(1, arc_len);
+    int32_t segments = (steps % 31) + 1;
+    fp15_t dtheta = (theta / (steps > 31 ? 31 : steps));
+ 
+    // basis vectors
+    // second bais is perpendicular to e1
+    int16_t su[2] = {fp15_div(umc[0],r), fp15_div(umc[1],r)};
+    int32_t e1[2] = {su[0], su[1]};
+    int32_t e2[2] = {-e1[1], e1[0]};
+    if (clockwise) {
+        e2[0] =  e1[1];
+        e2[1] = -e1[0];
+    }
+    fp15_t dcos=0, dsin=0;
+    cordic_sincos(dtheta,&dcos,&dsin);
+    int32_t x = -mul_i32_q15(r,dcos); // initial condition is [r,0];
+    int32_t y = -mul_i32_q15(r,dsin); // [x,y] * [[cos(theta) - sin(theta)],[sin(theta) + cos(theta)]];
+    
+    // breakes down when recalculating, so removed. still breaks for large stepping segments
+    // do to drift.
+    // TODO : add recalculation
+    int16_t point[2] = {0,0};
+    for(int i = 0; i < steps; i++){
+        point[0] = (c[0] + x * e1[0] + y * e2[0]) >> Q15_BITS;
+        point[1] = (c[1] + x * e1[1] + y * e2[1]) >> Q15_BITS;
+        int32_t x_new = mul_i32_q15(x,dsin) + mul_i32_q15(y,dcos);
+        int32_t y_new = mul_i32_q15(x,dcos) - mul_i32_q15(y,dsin);
+        x = x_new;
+        y = y_new;
+    }
+}

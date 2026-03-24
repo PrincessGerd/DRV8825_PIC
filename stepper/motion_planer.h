@@ -8,6 +8,13 @@
 extern const struct stepper_initEvt* drv8825_workEvt;
 extern const struct stepper_initEvt* drv8825_initEvt;
 
+typedef enum {
+    G_ARC_CW = 0,
+    G_ARC_CCW,
+    G_LINE,
+    G_DWELL
+} gcode_cmd_t;
+
 enum motion_planer_signals{
     EV_IDLE_SIG,
     EV_WORK_SIG,
@@ -16,9 +23,9 @@ enum motion_planer_signals{
 };
 typedef struct stepper_workEvt{
     event_t     super;
-    uint32_t    steps_x;
-    uint32_t    steps_y;
-    uint16_t    desired_speed; 
+    gcode_cmd_t mode;
+    int16_t X, Y;
+    int16_t I, J;
 }stepper_workEvt_t;
 
 typedef struct stepper_initEvt{

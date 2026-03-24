@@ -11,8 +11,8 @@
 
 #define AXIS_STEPPER_BUFFER_SIZE 32
 #define NUM_DESCRIPTORS 2
-
-typedef union __attribute__((packed, aligned(4))) uv{
+//__attribute__((packed, aligned(4))) 
+typedef union uv {
     struct{
         uint16_t u;
         uint16_t v;

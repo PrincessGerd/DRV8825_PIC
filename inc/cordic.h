@@ -1,15 +1,12 @@
-#ifndef MATH_H
-#define  MATH_H
+#ifndef CORDIC_H
+#define CORDIC_H
  
 #include <stdint.h>
+#include "math.h"
  
-#define FP_SHIFT 15
-#define FP_ONE   (1U << FP_SHIFT)
-typedef int16_t fp15_t;
- 
-#define HALF_PI FP_ONE/4
-#define PI      FP_ONE/2
-#define CORDIC_K 0x00009b75
+#define HALF_PI  (FP_ONE/4)
+#define PI       (FP_ONE/2)
+#define CORDIC_K (19897)
  
 typedef enum {
   CORDIC_ROTATION = 0,

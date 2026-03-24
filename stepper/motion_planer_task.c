@@ -6,15 +6,14 @@
 
 
 static const struct stepper_workEvt _drv8825_workEvt = {
-    .desired_speed = 4000,
-    .steps_x = 15000,
-    .steps_y = 12000,
-    .super.signal = STEPPER_WORK_SIG
+    .X = 15000,
+    .Y = 12000,
+    .super.signal = EV_WORK_SIG
 };
 const struct stepper_initEvt* drv8825_workEvt = &_drv8825_workEvt;
 
 static const struct stepper_initEvt _drv8825_initEvt = {
-    .super.signal = STEPPER_WORK_SIG,
+    .super.signal = EV_WORK_SIG,
     .tick_frequency = 64000000/32
 };
 /*

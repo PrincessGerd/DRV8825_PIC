@@ -19,11 +19,10 @@ static const pwm_hw_config_t pwm_config = {
 
 // Buffer stream must be in form [[u, v], [u, v]]
 // destination pointer is [pwm1S1, pwm1S2]
-#define AXES_PER_MODULE 2
-
-
 
 typedef struct axis_stepper {
+    task_t* owner;
+    event_t evt;    
     struct dma_hw* dma;     // DMA for this stepper
     struct pwm_hw* pwm;     // PWM for this steper (2 slices)
     uint32_t steps_remaining;   // steps remaining of dominant stepper
@@ -38,7 +37,9 @@ static volatile uint16_t* const period_regs[2] = {&PWM1S1P1L, &PWM2S1P1L}; // ba
 
 void axis_stepper_instance(axis_stepper_t** inst_out, task_t* const owner, uint8_t module_num){
     if (module_num >= 4 || inst_out == 0) return;
+    if(owner == 0) return;
     dma_hw_create(module_num,&instance.dma);
+    instance.owner = owner;
     *inst_out = &instance;
 }
 
@@ -79,16 +80,8 @@ void axis_stepper_init(
 void axis_stepper_start_move(
     axis_stepper_t* self,
     uint32_t steps){
-        int idx = 0;
-        while(idx < AXIS_STEPPER_BUFFER_SIZE){
-            self->bufffer[0][idx].axis.u = (0xFFFE - idx*256);
-            self->bufffer[1][idx].axis.u = ((uint16_t)self->bufffer[1][idx].axis.u - idx*256);
-            self->bufffer[0][idx].axis.v = (0xFFFE - idx*256);
-            self->bufffer[1][idx].axis.v = ((uint16_t)self->bufffer[1][idx].axis.v - idx*256);
-            idx+=1;
-        }
-        (period_regs[0]) = self->bufffer[0][0].axis.u;
-        (period_regs[0]+sizeof(uint16_t)) = self->bufffer[0][0].axis.v;
+        *(period_regs[0]) = self->bufffer[0][0].axis.u;
+        *(period_regs[0]+sizeof(uint16_t)) = self->bufffer[0][0].axis.v;
         self->steps_remaining = steps;
         pwm_set_period_common(self->pwm, 0xFFFF);
         dma_descriptor_start(&self->dma_disp_handle);     // push first dma descriptor
@@ -108,12 +101,12 @@ void __interrupt(irq(0x4)) dma_axis1_isr(void){
     dma_descriptor_dispatch(&stepper->dma_disp_handle); // swap and re-amr dma
     dma_descriptor_dispatch(&stepper->dma_disp_handle);
     if(stepper->steps_remaining > 0){
-        stepper->evt.signal = STEPPER_UPDATE_SIG;  // inform motion planer of empty buffer
+        stepper->evt.signal = EV_BUFFER_FILL_SIG;  // inform motion planer of empty buffer
         task_event_post(stepper->owner,&stepper->evt);
         stepper->steps_remaining -= AXIS_STEPPER_BUFFER_SIZE;
     }else{
         pwm_hw_disable(stepper->pwm);
-        stepper->evt.signal = STEPPER_DONE_SIG;  // inform motion planer of empty buffer
+        stepper->evt.signal = EV_DONE_SIG;  // inform motion planer of move done
         task_event_post(stepper->owner,&stepper->evt);
     }
 }
