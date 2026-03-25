@@ -134,10 +134,10 @@ void arc_move(int16_t* u[2], struct move_state* ms, uint16_t* out_buffer){
     for(int i = 0; i < (AXIS_STEPPER_BUFFER_SIZE * sizeof(int16_t)); i+=2){
         ms->theta += dtheta;
         // TODO: this is wrong the steps should be defined as [0,1], [-1, 0] ... [1,1] and so on.
-        out_buffer[i] = (x * ms->e1[0] + y * ms->e2[0]) >> Q15_BITS;
-        out_buffer[i+1] = (x * ms->e1[1] + y * ms->e2[1]) >> Q15_BITS;
         int32_t x_new = mul_i32_q15(x,dsin) + mul_i32_q15(y,dcos);
         int32_t y_new = mul_i32_q15(x,dcos) - mul_i32_q15(y,dsin);
+        out_buffer[i]   = ((x_new - x) * ms->e1[0] + (y_new - y) * ms->e2[0]) >> Q15_BITS;
+        out_buffer[i+1] = ((x_new - x) * ms->e1[1] + (y_new - y) * ms->e2[1]) >> Q15_BITS;
         x = x_new;
         y = y_new;
         ms->steps--;
@@ -174,18 +174,19 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             int16_t dominant = (dx < dy) ? dy : dx;
             struct move_cmd* next_move = PTR_ADD(&event->super, sizeof(event->super));
             ring_buffer_enqueue(move_queue, (uint8_t*)(next_move));
-            if(!self->active){
-                axis_stepper_start_move(self->axes,dominant);
-                self->evt.signal = EV_BUFFER_FILL_SIG;   
+            if(self->active == 0){
+                self->curr_move = next_move;
+                self->evt.signal = EV_DONE_SIG;   
                 task_event_post(super,&self->evt);
             }  
         } break;
         ////////////////////////////////////////////////////////
         case EV_BUFFER_FILL_SIG:{
+            TRISCbits.TRISC7 = 0;
             int16_t* fill;
-            fill = axis_stepper_get_fill_buffer(self->axes);
+            axis_stepper_get_fill_buffer(self->axes, &fill);
             switch (self->curr_move->mode) {
-                case G_ARC_CCW | G_ARC_CW:
+                case G_ARC_CW: // G_ARC_CCW || 
                     arc_move(
                         self->last_pos,self->ms, fill);
                     break;
@@ -205,17 +206,17 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             struct move_cmd next_move;
             ring_buffer_dequeue(move_queue, (uint8_t*)(&next_move));  
             if(&next_move == 0) return;
-            *self->curr_move = next_move;
+            self->curr_move = &next_move;
             int16_t* fill;
-            fill = axis_stepper_get_fill_buffer(self->axes);
+            axis_stepper_get_fill_buffer(self->axes, &fill);
             switch (self->curr_move->mode) {
-                case G_ARC_CCW | G_ARC_CW:
+                case G_ARC_CW:
                     arc_move_init(self->last_pos, 
                         self->curr_move->X, self->curr_move->Y,
                         self->curr_move->I, self->curr_move->J,
                         self->curr_move->mode, self->ms);
                     arc_move(
-                        self->last_pos,self->ms, fill);
+                        self->last_pos,self->ms, (uint16_t*)fill);
                     break;
                 case G_LINE:
                     gcode_line(
@@ -231,11 +232,12 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             int16_t dy = self->curr_move->Y - self->last_pos[1];   // steps in x axis
             int16_t dominant = (dx < dy) ? dy : dx;
             axis_stepper_start_move(self->axes,dominant);
-            TRISCbits.TRISC7 = 1;
+            self->evt.signal = EV_BUFFER_FILL_SIG;   
+            task_event_post(super,&self->evt);
         }break;
         ////////////////////////////////////////////////////////
         case EV_IDLE_SIG: {
-            // do nothing. just defined for traceability
+            // do nothing. just defined for tracing
         }break;
     default:
         break;

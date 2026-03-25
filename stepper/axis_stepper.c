@@ -19,7 +19,9 @@ static const pwm_hw_config_t pwm_config = {
 
 // Buffer stream must be in form [[u, v], [u, v]]
 // destination pointer is [pwm1S1, pwm1S2]
-
+// TODO : the direction isnt set by the pwm, so there must be another way to set it.
+//          - try not to use up the dma's for this, 
+//          - the first bit in the int gives directionality, so that might be of use
 typedef struct axis_stepper {
     task_t* owner;
     event_t evt;    
@@ -28,7 +30,7 @@ typedef struct axis_stepper {
     uint32_t steps_remaining;   // steps remaining of dominant stepper
     dma_descriptor_handle_t dma_disp_handle;
     dma_descriptor_t descriptors[NUM_DESCRIPTORS]; // linked list of dma descriptors for buffer swap
-    uv_t bufffer[NUM_DESCRIPTORS][AXIS_STEPPER_BUFFER_SIZE];   // equal number of buffers
+    uint16_t bufffer[NUM_DESCRIPTORS][AXIS_STEPPER_BUFFER_SIZE * sizeof(uint16_t)];   // equal number of buffers
     uint8_t axis_count;  // number of axes for this stepper
 } axis_stepper_t;
 
@@ -63,9 +65,9 @@ void axis_stepper_init(
         //init and link buffers to descriptors
         for (int i = 0; i < NUM_DESCRIPTORS; i++) {
             self->descriptors[i].src     = (uint24_t)&self->bufffer[i][0];
-            self->descriptors[i].srcSize = AXIS_STEPPER_BUFFER_SIZE * sizeof(uv_t);
+            self->descriptors[i].srcSize = AXIS_STEPPER_BUFFER_SIZE * sizeof(uint32_t);
             self->descriptors[i].dst     = (uint24_t)period_regs[0];
-            self->descriptors[i].dstSize = sizeof(uv_t);   // two 16-bit registers
+            self->descriptors[i].dstSize = sizeof(uint32_t);   // two 16-bit registers
             self->descriptors[i].next    = 0;
             dma_descriptor_enqueue(&self->dma_disp_handle, &self->descriptors[i]);
         }
@@ -80,22 +82,24 @@ void axis_stepper_init(
 void axis_stepper_start_move(
     axis_stepper_t* self,
     uint32_t steps){
-        *(period_regs[0]) = self->bufffer[0][0].axis.u;
-        *(period_regs[0]+sizeof(uint16_t)) = self->bufffer[0][0].axis.v;
+
+        *(period_regs[0]) = self->bufffer[0][0];
+        *(period_regs[0]+sizeof(uint16_t)) = self->bufffer[0][1];
         self->steps_remaining = steps;
         pwm_set_period_common(self->pwm, 0xFFFF);
         dma_descriptor_start(&self->dma_disp_handle);     // push first dma descriptor
         dma_descriptor_dispatch(&self->dma_disp_handle); // arm next 
         pwm_hw_enable(self->pwm);
+        dma_hw_enable(self->dma);
 }
 
-uv_t* axis_stepper_get_fill_buffer(struct axis_stepper* self){
-    return (uv_t*)self->dma_disp_handle.fill->src;
+void axis_stepper_get_fill_buffer(struct axis_stepper* self, uint16_t **out){
+    *out = ((uint16_t*)self->dma_disp_handle.fill->src);
 }
 
 void __interrupt(irq(0x4)) dma_axis1_isr(void){
     interrupt_clear(0x4);
-    TRISCbits.TRISC7 ^= 1;
+    //TRISCbits.TRISC7 ^= 1;
     axis_stepper_t* stepper = &instance;
     // bit anoying that is has to be called twice. but necesary to always have a active dma
     dma_descriptor_dispatch(&stepper->dma_disp_handle); // swap and re-amr dma
