@@ -47,6 +47,5 @@ void gpio_read(uint8_t io_pin, bool* value);
 void gpio_toggle(uint8_t io_pin);
 void gpio_set_mode(uint8_t io_pin, gpio_mode_e mode);
 void gpio_set_direction(uint8_t io_pin, gpio_dir_e direction);
-
 #endif	/* GPIO_H */
 

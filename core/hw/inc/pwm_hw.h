@@ -68,4 +68,6 @@ void pwm_hw_enable_buffered(const struct pwm_hw* self);
 void pwm_hw_disable_buffered(const struct pwm_hw* self);
 void pwm_set_period_common(const struct pwm_hw* self, uint16_t period);
 void pwm_set_period_Px(const struct pwm_hw* self, pwmx_outputs_e px, uint16_t period);
+void pwm_hw_set_lds(const struct pwm_hw* self, uint8_t lds);
+void pwm_hw_masked_enable(uint8_t mask);
 #endif
