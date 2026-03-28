@@ -1,5 +1,4 @@
 #include "motion_planer.h"
-#include "stepper_device.h"
 #include "axis_stepper.h"
 // core
 #include "../core/types.h"
@@ -7,6 +6,7 @@
 #include "../core/system.h"
 #include "../core/interrupts.h"
 #include "../core/dma_descriptor.h"
+#include "../core/gpio.h"
 //
 #include "../inc/math.h"
 #include "../inc/cordic.h"
@@ -25,11 +25,14 @@ struct move_cmd {
 };
 
 struct move_state{
-    int32_t e1[2], e2[2];   // basis vectors
-    int32_t c[2];           // center point
-    int32_t steps;          // remaining steps 
-    int32_t theta;          // total angle between points
-    int16_t radius;         // 
+    int32_t e1[2], e2[2];       // basis vectors
+    int32_t c[2];               // center point
+    int32_t steps_remaining;    //
+    int16_t dcos;               //
+    int16_t dsin;               //
+    int16_t x;
+    int16_t y; 
+    bool clockwise;             // rotation direction
 };
 
 struct motion_planer{
@@ -40,6 +43,8 @@ struct motion_planer{
     uint8_t axis_count;
     uint8_t active;
     int16_t last_pos[2];
+    uint8_t maskx;
+    uint8_t masky;
     struct move_cmd* curr_move;
     struct move_state* ms;
 };
@@ -48,36 +53,47 @@ RING_BUFFER_DECLARE(move_queue,MOVEMENT_BUFER_SIZE,sizeof(struct move_cmd))
 static void stepper_init(task_t* const super, event_t const* const ie);
 static void stepper_dispatch(task_t* const super, event_t* const e);
 
-void gcode_line(
-    int16_t U[2], 
-    int16_t X, int16_t Y) {
-        
-    int16_t x0 = U[0];
-    int16_t y0 = U[1];
-    int16_t dx = (X > x0) ? (X - x0) : (x0 - X);
-    int16_t dy = (Y > y0) ? (Y - y0) : (y0 - Y);
-    int16_t sx = (x0 < X) ? 1 : -1;
-    int16_t sy = (y0 < Y) ? 1 : -1;
+int gcode_line(
+    int16_t dx, int16_t dy,
+    uint8_t maskx,
+    uint8_t masky,
+    uint8_t* out_buffer)
+{
+    int16_t sx = (dx >= 0) ? 1 : -1;
+    int16_t sy = (dy >= 0) ? 1 : -1;
+
+    dx = (dx >= 0) ? dx : -dx;
+    dy = (dy >= 0) ? dy : -dy;
+
+    int16_t countx = 0;
+    int16_t county = 0;
 
     int16_t err = dx - dy;
-    int16_t point[2] = {x0,y0};
-    while(true) {
-        //printf("%d,%d\n", x0, y0);
-        if (x0 == X && y0 == Y)
-            break;
+    int16_t i = 0;
+
+    while (1) {
         int16_t e2 = (err << 1);
+        uint8_t point = 0;
+
+        if (countx == dx && county == dy)
+            break;
+
         if (e2 > -dy) {
             err -= dy;
-            x0 += sx;
+            countx++;
+            point |= maskx;
         }
         if (e2 < dx) {
             err += dx;
-            y0 += sy;
+            county++;
+            point |= masky;
         }
+        out_buffer[i++] = point;
     }
+    return i;
 }
 
-
+#define MAX_DTHETA_Q15 (1 << 10)
 void arc_move_init(
     int16_t* u[2],
     int16_t X, int16_t Y,
@@ -100,13 +116,11 @@ void arc_move_init(
         cordic_atan2(sin_theta, cos_theta, &theta);
     
         if (clockwise)
-            theta = -theta;
-        if (theta < 0)
-            theta += Q15_ONE;
+            theta -= theta;
     
-        int32_t arc_len = mul_i32_q15(r,theta);
-        int32_t steps = max(1, arc_len);
-    
+        int32_t steps =
+            (abs(theta) + (MAX_DTHETA_Q15 << 1) - 1) / MAX_DTHETA_Q15;
+
         // basis vectors
         // second bais is perpendicular to e1
         int16_t su[2] = {fp15_div(umc[0],r), fp15_div(umc[1],r)};
@@ -116,31 +130,38 @@ void arc_move_init(
             e2[0] =  e1[1];
             e2[1] = -e1[0];
         }
+        fp15_t dtheta = (theta / steps);
+        fp15_t dcos=0, dsin=0;
+        cordic_sincos(dtheta,&dcos,&dsin);
+        if (clockwise)
+            dsin -= dsin;
+            
         out_state->e1[0] = e1[0];
-        out_state->e1[0] = e1[0];
+        out_state->e2[0] = e2[0];
+        out_state->e1[1] = e1[1];
         out_state->e2[1] = e2[1];
-        out_state->e2[1] = e2[1];
-        out_state->theta = theta;
-        out_state->steps = steps;
-        out_state->radius = r;
+        out_state->steps_remaining = steps;
+        out_state->dcos = dcos;
+        out_state->dsin = dsin;
+        out_state->x = r*Q15_ONE;
+        out_state->y = 0;
+        out_state->c[0] = c[0];
+        out_state->c[1] = c[1];
     }
 
-void arc_move(int16_t* u[2], struct move_state* ms, uint16_t* out_buffer){
-    fp15_t dtheta = (ms->theta / ms->steps);
-    fp15_t dcos=0, dsin=0;
-    cordic_sincos(dtheta,&dcos,&dsin);
-    int32_t x = -mul_i32_q15(ms->radius,dcos); // initial condition is [r,0];
-    int32_t y = -mul_i32_q15(ms->radius,dsin); // [x,y] * [[cos(theta) - sin(theta)],[sin(theta) + cos(theta)]];
-    for(int i = 0; i < (AXIS_STEPPER_BUFFER_SIZE * sizeof(int16_t)); i+=2){
-        ms->theta += dtheta;
-        // TODO: this is wrong the steps should be defined as [0,1], [-1, 0] ... [1,1] and so on.
-        int32_t x_new = mul_i32_q15(x,dsin) + mul_i32_q15(y,dcos);
-        int32_t y_new = mul_i32_q15(x,dcos) - mul_i32_q15(y,dsin);
-        out_buffer[i]   = ((x_new - x) * ms->e1[0] + (y_new - y) * ms->e2[0]) >> Q15_BITS;
-        out_buffer[i+1] = ((x_new - x) * ms->e1[1] + (y_new - y) * ms->e2[1]) >> Q15_BITS;
-        x = x_new;
-        y = y_new;
-        ms->steps--;
+void arc_move(int16_t* u[2], struct move_state* ms, uint8_t maskx, uint8_t masky, uint8_t* out_buffer){
+    int N = (AXIS_STEPPER_BUFFER_SIZE < ms->steps_remaining) ? 
+        AXIS_STEPPER_BUFFER_SIZE : ms->steps_remaining;
+    for(int i = 0; i < N; i++){
+        int32_t x_new = mul_i32_q15(ms->x,ms->dcos) - mul_i32_q15(ms->y,ms->dsin);
+        int32_t y_new = mul_i32_q15(ms->x,ms->dsin) + mul_i32_q15(ms->y,ms->dcos);
+        int32_t dx = ms->c[0] + (mul_i32_q15((x_new - ms->x), ms->e1[0]) + mul_i32_q15((y_new - ms->y),ms->e2[0])) >> Q15_BITS;
+        int32_t dy = ms->c[1] + (mul_i32_q15((x_new - ms->x), ms->e1[1]) + mul_i32_q15((y_new - ms->y),ms->e2[1])) >> Q15_BITS;
+        ms->x = x_new;
+        ms->y = y_new;
+        // TODO : add a way for the line generator to know where in the buffer it is
+        i +=  gcode_line(dx,dy, maskx, masky, out_buffer);
+        ms->steps_remaining--;
     }
 }
 
@@ -159,7 +180,10 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     self->axis_count = 2;
     self->tick_frequency = 64000000/32; // ie->tick_frequency;
     self->active = 0;
-    axis_stepper_init(self->axes, self->axis_count);  
+    uint8_t port_mask = 0b01111011;
+    self->maskx = RC_4;
+    self->masky = RC_3;
+    axis_stepper_init(self->axes, self->axis_count, &LATC, port_mask);  
     move_queue_init();  
 }
 
@@ -188,12 +212,13 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             switch (self->curr_move->mode) {
                 case G_ARC_CW: // G_ARC_CCW || 
                     arc_move(
-                        self->last_pos,self->ms, fill);
+                        self->last_pos,self->ms, self->maskx, self->masky, fill);
                     break;
                 case G_LINE:
+                    int16_t dx = self->curr_move->X - self->last_pos[0];   // steps in y axis
+                    int16_t dy = self->curr_move->Y - self->last_pos[1];   // steps in x axis
                     gcode_line(
-                        self->last_pos,
-                        self->curr_move->X, self->curr_move->Y);
+                        dx, dy, self->maskx, self->masky, fill);
                     break;         
                 case G_DWELL:
                     break; // not sure how to handle this yet. dont want to waste compute time
@@ -207,8 +232,10 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             ring_buffer_dequeue(move_queue, (uint8_t*)(&next_move));  
             if(&next_move == 0) return;
             self->curr_move = &next_move;
-            int16_t* fill;
+            uint8_t* fill;
             axis_stepper_get_fill_buffer(self->axes, &fill);
+            int16_t dx = self->curr_move->X - self->last_pos[0];   // steps in y axis
+            int16_t dy = self->curr_move->Y - self->last_pos[1];   // steps in x axis
             switch (self->curr_move->mode) {
                 case G_ARC_CW:
                     arc_move_init(self->last_pos, 
@@ -216,20 +243,17 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                         self->curr_move->I, self->curr_move->J,
                         self->curr_move->mode, self->ms);
                     arc_move(
-                        self->last_pos,self->ms, (uint16_t*)fill);
+                        self->last_pos,self->ms, self->maskx, self->masky, fill);
                     break;
                 case G_LINE:
                     gcode_line(
-                        self->last_pos,
-                        self->curr_move->X, self->curr_move->Y);
+                        dx, dy, self->maskx, self->masky, fill);
                     break;         
                 case G_DWELL:
                     break; // not sure how to handle this yet. dont want to waste compute time
                 default:
                     break;
             }
-            int16_t dx = self->curr_move->X - self->last_pos[0];   // steps in y axis
-            int16_t dy = self->curr_move->Y - self->last_pos[1];   // steps in x axis
             int16_t dominant = (dx < dy) ? dy : dx;
             axis_stepper_start_move(self->axes,dominant);
             self->evt.signal = EV_BUFFER_FILL_SIG;   

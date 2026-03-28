@@ -3,7 +3,6 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "../core/task_manager.h"
-#include "stepper_device.h"
 
 extern const struct stepper_initEvt* drv8825_workEvt;
 extern const struct stepper_initEvt* drv8825_initEvt;

@@ -7,9 +7,9 @@
 #include <xc.h>
 
 int task_run(void) { // to prevent reset
-    system_init();
-    systick_config(10000, SYS_TICK_TIMER);
-    systick_config(2000000, FAST_TICK_TIMER);
+    //system_init();
+    //systick_config(10000, SYS_TICK_TIMER);
+    //systick_config(2000000, FAST_TICK_TIMER);
     while(1) {
         __nop();
     }
