@@ -61,7 +61,7 @@ void axis_stepper_init(
             self->dma,                  //
             DMA_MEM_SFR_GPR_SEL,        // use ram
             DMA_ACCESS_MODE_INCREMENT,  // increment src ptr
-            DMA_ACCESS_MODE_UNCHAINGED,  // increment dst ptr
+            DMA_ACCESS_MODE_UNCHAINGED, // static dst ptr
             true,                       // stop on end of buffer
             false);                     // no change on dst count
         dma_hw_set_arbiter_prio(self->dma, 1);   // this is reqired for dma to start
@@ -74,8 +74,8 @@ void axis_stepper_init(
         for (int i = 0; i < NUM_DESCRIPTORS; i++) {
             self->descriptors[i].src     = (uint24_t)&self->bufffer[i][0];
             self->descriptors[i].srcSize = AXIS_STEPPER_BUFFER_SIZE;
-            self->descriptors[i].dst     = (uint24_t)&LATC;//*self->port;
-            self->descriptors[i].dstSize = 1;   // single port 8-bit register
+            self->descriptors[i].dst     = (uint24_t)&PORTC;//*self->port;
+            self->descriptors[i].dstSize = sizeof(uint8_t);   // single port 8-bit register
             self->descriptors[i].next    = 0;
             dma_descriptor_enqueue(&self->dma_disp_handle, &self->descriptors[i]);
         }
@@ -88,8 +88,8 @@ void axis_stepper_start_move(
         *self->port &= ~self->port_mask; // clear port
         self->steps_remaining = steps;
         for(int i = 0; i < AXIS_STEPPER_BUFFER_SIZE; i++){
-            self->bufffer[0][i] = RC_4 | RC_3;
-            if(i % 4  == 0){
+            self->bufffer[0][i] = ((1 << 4) | (1 << 3));
+            if(i % 2  == 0){
                 self->bufffer[0][i] = 0;
             }
         }
@@ -97,7 +97,6 @@ void axis_stepper_start_move(
         dma_descriptor_dispatch(&self->dma_disp_handle); // arm next 
         dma_hw_enable(self->dma);
         timer1_enable(tick_timer);
-        //interrupt_enable(0x1D);
 }
 
 void axis_stepper_get_fill_buffer(struct axis_stepper* self, uint8_t **out){

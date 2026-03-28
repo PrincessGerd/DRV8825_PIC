@@ -181,8 +181,8 @@ static void stepper_init(task_t* const super, event_t const* const ie){
     self->tick_frequency = 64000000/32; // ie->tick_frequency;
     self->active = 0;
     uint8_t port_mask = 0b01111011;
-    self->maskx = RC_4;
-    self->masky = RC_3;
+    self->maskx = (1 << 4); // RC4
+    self->masky = (1 << 3); // RC3
     axis_stepper_init(self->axes, self->axis_count, &LATC, port_mask);  
     move_queue_init();  
 }

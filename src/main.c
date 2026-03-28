@@ -28,17 +28,17 @@ int main(void) {
     gpio_set_mode(RC_4, IO_MODE_DIGITAL);
     gpio_set_direction(RC_3, IO_DIR_OUTPUT);
     gpio_set_mode(RC_3, IO_MODE_DIGITAL);
-    INTCON0bits.GIE = 0; //Suspend interrupts
-    PPSLOCK = 0x55; //Required sequence
-    PPSLOCK = 0xAA; //Required sequence
-    PPSLOCKbits.PPSLOCKED = 0; //Set PPSLOCKED bit
-    INTCON0bits.GIE = 1; //Restore interrupts
-    RC4PPS = 0x07;
-    RC3PPS = 0x08;
-    INTCON0bits.GIE = 0; //Suspend interrupts
-    PPSLOCK = 0x55; //Required sequence
-    PPSLOCK = 0xAA; //Required sequence
-    PPSLOCKbits.PPSLOCKED = 1; //Set PPSLOCKED bit
+    //INTCON0bits.GIE = 0; //Suspend interrupts
+    //PPSLOCK = 0x55; //Required sequence
+    //PPSLOCK = 0xAA; //Required sequence
+    //PPSLOCKbits.PPSLOCKED = 0; //Set PPSLOCKED bit
+    //INTCON0bits.GIE = 1; //Restore interrupts
+    //RC4PPS = 0x07;
+    //RC3PPS = 0x08;
+    //INTCON0bits.GIE = 0; //Suspend interrupts
+    //PPSLOCK = 0x55; //Required sequence
+    //PPSLOCK = 0xAA; //Required sequence
+    //PPSLOCKbits.PPSLOCKED = 1; //Set PPSLOCKED bit
     INTCON0bits.GIE = 1; //Restore interrupts
     stepper_create(&AO_drv8825);
     static event_t* StpQueue[4];
@@ -59,5 +59,6 @@ int main(void) {
     //axis_stepper_instance(&step,0,0);
     //axis_stepper_init(step,2);
     //axis_stepper_start_move(step,2000);
+    //LATCbits.LATC4 = 1;
     return task_run();
 }
