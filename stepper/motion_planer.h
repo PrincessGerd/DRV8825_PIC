@@ -23,7 +23,7 @@ struct move_cmd {
 enum motion_planer_signals{
     EV_IDLE_SIG = 0,
     EV_WORK_SIG,
-    EV_DONE_SIG,
+    EV_MOVE_DONE_SIG,
     EV_BUFFER_FILL_SIG
 };
 typedef struct stepper_workEvt{

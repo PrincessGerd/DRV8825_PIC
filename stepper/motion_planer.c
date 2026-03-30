@@ -29,6 +29,9 @@ union stepper_port {
     };
     uint8_t mask;
 };
+#define DIR_MASK(port) ((uint8_t)(port.x_dir | port.y_dir))
+#define PORT_MASK(port) ((uint8_t)(port.x_step | port.y_step))
+
 
 
 struct move_state{
@@ -86,7 +89,7 @@ int gcode_line(
         if (e2 > -dy) {
             err -= dy;
             countx++;
-            point |= port.x_step | (sx < 0 ? port.x_dir : 0);;
+            point |= port.x_step | (sx < 0 ? port.x_dir : 0);
         }
 
         if (e2 < dx) {
@@ -97,7 +100,7 @@ int gcode_line(
         // TODO: find a way to make sure the transistion between descriptors doesnt end on high
         out_buffer[i] = point;
         i++;
-        out_buffer[i] &= ~point;
+        out_buffer[i] = point & DIR_MASK(port);
         i++;
     }
     return (i - offset);
@@ -118,7 +121,7 @@ void arc_move_init(
     
         int32_t r;
         cordic_hypot(umc[0], umc[1], &r);
-        r = r < 0 ? -r : r;
+        r = abs(r);
 
         int32_t sin_theta = (((int32_t)umc[0]*vmc[1] - (int32_t)umc[1]*vmc[0])); // cross
         int32_t cos_theta = (((int32_t)umc[0]*vmc[0] + (int32_t)umc[1]*vmc[1])); // dot
@@ -212,14 +215,11 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
         ////////////////////////////////////////////////////////
         case EV_WORK_SIG:{
             struct stepper_workEvt* event = (struct stepper_workEvt*)e;
-            int16_t dx = event->X - self->last_pos[0];   // steps in y axis
-            int16_t dy = event->Y - self->last_pos[1];   // steps in x axis
-            int16_t dominant = (dx < dy) ? dy : dx;
             struct move_cmd* next_move = PTR_ADD(&event->super, sizeof(event_t));
             ring_buffer_enqueue(move_queue, next_move);
             if(self->active == 0){
                 self->curr_move = next_move;
-                self->evt.signal = EV_DONE_SIG;   
+                self->evt.signal = EV_MOVE_DONE_SIG;   
                 task_event_post(super,&self->evt);
             }  
         } break;
@@ -248,10 +248,12 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             self->last_pos[1] = self->curr_move->Y;
         } break;
         ////////////////////////////////////////////////////////
-        case EV_DONE_SIG:{
+        case EV_MOVE_DONE_SIG:{
             struct move_cmd next_move;
             bool bdone = ring_buffer_dequeue(move_queue, (uint8_t*)(&next_move));  
             if(bdone == false){
+                self->evt.signal = EV_IDLE_SIG;   
+                task_event_post(super,&self->evt);
                 return;
             }
             self->curr_move = &next_move;

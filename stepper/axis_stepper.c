@@ -110,7 +110,7 @@ void __interrupt(irq(0x4)) dma_axis1_isr(void){
         stepper->steps_remaining -= AXIS_STEPPER_BUFFER_SIZE;
     }else{
         timer1_disable(tick_timer);
-        stepper->evt.signal = EV_DONE_SIG;  // inform motion planer of move done
+        stepper->evt.signal = EV_MOVE_DONE_SIG;  // inform motion planer of move done
         task_event_post(stepper->owner,&stepper->evt);
         *stepper->port &= ~stepper->port_mask;
     }

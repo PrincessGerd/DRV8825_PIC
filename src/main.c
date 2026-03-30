@@ -26,8 +26,12 @@ int main(void) {
     PIE0bits.DMA1SCNTIE = 1;                 // Enable source count done interrupt
     gpio_set_direction(RC_4, IO_DIR_OUTPUT);
     gpio_set_mode(RC_4, IO_MODE_DIGITAL);
-    gpio_set_direction(RC_3, IO_DIR_OUTPUT);
-    gpio_set_mode(RC_3, IO_MODE_DIGITAL);
+    gpio_set_direction(RC_5, IO_DIR_OUTPUT);
+    gpio_set_mode(RC_5, IO_MODE_DIGITAL);
+    gpio_set_direction(RC_1, IO_DIR_OUTPUT);
+    gpio_set_mode(RC_1, IO_MODE_DIGITAL);
+    gpio_set_direction(RC_0, IO_DIR_OUTPUT);
+    gpio_set_mode(RC_0, IO_MODE_DIGITAL);
     //INTCON0bits.GIE = 0; //Suspend interrupts
     //PPSLOCK = 0x55; //Required sequence
     //PPSLOCK = 0xAA; //Required sequence
