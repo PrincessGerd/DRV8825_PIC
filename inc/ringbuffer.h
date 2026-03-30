@@ -5,8 +5,8 @@
 #include <stdbool.h>
 
 #define MAX_BUFFER_LEN 256
-#define PTR_ADD(p,val)  ((uint8_t*)(p) + (val))
-#define PTR_SUB(p,val)  ((uint8_t*)(p) - (val))
+#define PTR_ADD(p,val)  ((void*)(p) + (val))
+#define PTR_SUB(p,val)  ((void*)(p) - (val))
 #define mod(a,b) (a & (b-1u))
 #define RB_INDEX(rb, i) (mod(i, (rb)->capacity))
 
@@ -22,7 +22,7 @@ typedef struct {
 } rb_state_t;
 
 #define RING_BUFFER_DECLARE(name, capacity_, type_) \
-    static uint8_t name##_memory[sizeof(rb_state_t) + (capacity_ * sizeof(type_))]; \
+    static uint8_t name##_memory[sizeof(rb_state_t) + (capacity_ * sizeof(type_))] = {0}; \
     static rb_state_t* name = (rb_state_t*)name##_memory; \
     void name##_init(void) { \
         name->capacity = (capacity_); \
@@ -47,7 +47,7 @@ bool ring_buffer_dequeue(rb_state_t* rb, void* out_item);
         for(int i=0; i < 48; i++){
             ring_buffer_enqueue(midi_buffer, &i);
         }
-            
+
         uint32_t data_out;
         for(int i=0; i < 48; i++){
             ring_buffer_dequeue(midi_buffer, &data_out);

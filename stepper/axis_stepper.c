@@ -26,7 +26,7 @@ typedef struct axis_stepper {
     struct dma_hw* dma;         // DMA for this stepper
     volatile uint8_t* port;
     volatile uint8_t  port_mask;
-    uint32_t steps_remaining;   // steps remaining of dominant axis
+    int32_t steps_remaining;   // steps remaining of dominant axis
     dma_descriptor_handle_t dma_disp_handle;
     dma_descriptor_t descriptors[NUM_DESCRIPTORS]; // linked list of dma descriptors for buffer swap
     volatile uint8_t bufffer[NUM_DESCRIPTORS][AXIS_STEPPER_BUFFER_SIZE];   // equal number of buffers
@@ -49,7 +49,7 @@ void axis_stepper_instance(axis_stepper_t** inst_out, task_t* const owner, uint8
 void axis_stepper_init(
     axis_stepper_t* const self, 
     uint8_t axis_count,
-    uint8_t* port,
+    volatile uint8_t* port,
     uint8_t  mask){
         self->axis_count = axis_count;
         self->port = port;
@@ -84,18 +84,13 @@ void axis_stepper_init(
 
 void axis_stepper_start_move(
     axis_stepper_t* self,
-    uint32_t steps){
+    int32_t steps){
         *self->port = 0; // clear port
         self->steps_remaining = steps;
         dma_descriptor_start(&self->dma_disp_handle);     // push first dma descriptor
         dma_descriptor_dispatch(&self->dma_disp_handle); // arm next 
         dma_hw_enable(self->dma);
         timer1_enable(tick_timer);
-}
-
-void axis_stepper_get_all_buffers(struct axis_stepper* self, uint8_t **out, uint8_t* num_buffers){
-    *out = self->bufffer[0];
-    *num_buffers = NUM_DESCRIPTORS;
 }
 
 void axis_stepper_get_fill_buffer(struct axis_stepper* self, uint8_t **out){
@@ -106,7 +101,6 @@ void axis_stepper_get_fill_buffer(struct axis_stepper* self, uint8_t **out){
 // TODO : FIX PROBLEM WITH TIMER1 TRIGGER for DMA
 void __interrupt(irq(0x4)) dma_axis1_isr(void){
     interrupt_clear(0x4);
-    TRISCbits.TRISC7 ^= 1;
     axis_stepper_t* stepper = &instance;
     dma_descriptor_dispatch(&stepper->dma_disp_handle); // swap and re-amr dma
     //dma_descriptor_dispatch(&stepper->dma_disp_handle);

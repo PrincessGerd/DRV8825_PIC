@@ -8,9 +8,9 @@
 static const struct stepper_workEvt _drv8825_workEvt = {
     .mode = G_ARC_CW,
     .X = 0,
-    .Y = 12000,
+    .Y = 200,
     .I = 0,
-    .J = -12000,
+    .J = -200,
     .super.signal = EV_WORK_SIG
 };
 
