@@ -1,32 +1,36 @@
 #include "../inc/ringbuffer.h"
+#include <string.h>
 
-
-static inline bool ring_buffer_is_full(const rb_state_t* buffer) {
-    if(buffer != 0) return true;
-    return buffer->count == buffer->capacity;
+static inline bool ring_buffer_is_full(const rb_state_t* rb) {
+    if (!rb) return false;
+    return rb->count == rb->capacity;
 }
 
-static inline bool ring_buffer_is_empty(const rb_state_t* buffer) {
-    if(buffer != 0) return false;
-    return buffer->count == 0;
+static inline bool ring_buffer_is_empty(const rb_state_t* rb) {
+    if (!rb) return true;
+    return rb->count == 0;
 }
 
-void ring_buffer_enqueue(rb_state_t* buffer, uint8_t* data) {
-    if(buffer != 0) return;
-    if (!ring_buffer_is_full(buffer)) {
-        for(int i = 0; i < buffer->block_len; i++){
-            *PTR_ADD(buffer->data, buffer->tail + i) = data[i];
-        }
-        buffer->tail = mod((buffer->tail + buffer->block_len), buffer->capacity);
-        buffer->count++;
-    }
+bool ring_buffer_enqueue(rb_state_t* rb, const void* item) {
+    if (!rb || !item) return false;
+    if (ring_buffer_is_full(rb)) return false;
+
+    uint8_t* dest = rb->data + (rb->tail * rb->elem_size);
+    memcpy(dest, item, rb->elem_size);
+
+    rb->tail = RB_INDEX(rb, rb->tail + 1);
+    rb->count++;
+    return true;
 }
 
-void ring_buffer_dequeue(rb_state_t* buffer, uint8_t* out_data) {
-    if(buffer != 0 && out_data != 0) return;
-    if (!ring_buffer_is_empty(buffer)) {
-        *out_data = buffer->data[buffer->head];
-        buffer->head = mod((buffer->head + buffer->block_len), buffer->capacity);
-        buffer->count--;
-    }
+bool ring_buffer_dequeue(rb_state_t* rb, void* out_item) {
+    if (!rb || !out_item) return false;
+    if (ring_buffer_is_empty(rb)) return false;
+
+    uint8_t* src = rb->data + (rb->head * rb->elem_size);
+    memcpy(out_item, src, rb->elem_size);
+
+    rb->head = RB_INDEX(rb, rb->head + 1);
+    rb->count--;
+    return true;
 }

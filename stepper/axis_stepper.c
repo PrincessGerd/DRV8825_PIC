@@ -56,7 +56,7 @@ void axis_stepper_init(
         self->port_mask = mask;
 
         timer1_init(tick_timer, &tick_timer_cfg);
-        //timer0_set_counter(tick_timer,0xEFFF); // int on reload. can varry timing later if needed
+        timer1_set_counter(tick_timer, 0xEFFF); // int on reload. can varry timing later if needed
         dma_hw_configure(
             self->dma,                  //
             DMA_MEM_SFR_GPR_SEL,        // use ram
@@ -74,7 +74,7 @@ void axis_stepper_init(
         for (int i = 0; i < NUM_DESCRIPTORS; i++) {
             self->descriptors[i].src     = (uint24_t)&self->bufffer[i][0];
             self->descriptors[i].srcSize = AXIS_STEPPER_BUFFER_SIZE;
-            self->descriptors[i].dst     = (uint24_t)&PORTC;//*self->port;
+            self->descriptors[i].dst     = (uint24_t)self->port;
             self->descriptors[i].dstSize = sizeof(uint8_t);   // single port 8-bit register
             self->descriptors[i].next    = 0;
             dma_descriptor_enqueue(&self->dma_disp_handle, &self->descriptors[i]);
@@ -85,18 +85,17 @@ void axis_stepper_init(
 void axis_stepper_start_move(
     axis_stepper_t* self,
     uint32_t steps){
-        *self->port &= ~self->port_mask; // clear port
+        *self->port = 0; // clear port
         self->steps_remaining = steps;
-        for(int i = 0; i < AXIS_STEPPER_BUFFER_SIZE; i++){
-            self->bufffer[0][i] = ((1 << 4) | (1 << 3));
-            if(i % 2  == 0){
-                self->bufffer[0][i] = 0;
-            }
-        }
         dma_descriptor_start(&self->dma_disp_handle);     // push first dma descriptor
         dma_descriptor_dispatch(&self->dma_disp_handle); // arm next 
         dma_hw_enable(self->dma);
         timer1_enable(tick_timer);
+}
+
+void axis_stepper_get_all_buffers(struct axis_stepper* self, uint8_t **out, uint8_t* num_buffers){
+    *out = self->bufffer[0];
+    *num_buffers = NUM_DESCRIPTORS;
 }
 
 void axis_stepper_get_fill_buffer(struct axis_stepper* self, uint8_t **out){
@@ -109,9 +108,8 @@ void __interrupt(irq(0x4)) dma_axis1_isr(void){
     interrupt_clear(0x4);
     TRISCbits.TRISC7 ^= 1;
     axis_stepper_t* stepper = &instance;
-    // bit anoying that is has to be called twice. but necesary to always have a active dma
     dma_descriptor_dispatch(&stepper->dma_disp_handle); // swap and re-amr dma
-    dma_descriptor_dispatch(&stepper->dma_disp_handle);
+    //dma_descriptor_dispatch(&stepper->dma_disp_handle);
     if(stepper->steps_remaining > 0){
         stepper->evt.signal = EV_BUFFER_FILL_SIG;  // inform motion planer of empty buffer
         task_event_post(stepper->owner,&stepper->evt);
@@ -120,5 +118,7 @@ void __interrupt(irq(0x4)) dma_axis1_isr(void){
         timer1_disable(tick_timer);
         stepper->evt.signal = EV_DONE_SIG;  // inform motion planer of move done
         task_event_post(stepper->owner,&stepper->evt);
+        *stepper->port &= ~stepper->port_mask;
     }
+    task_event_consume(stepper->owner);
 }

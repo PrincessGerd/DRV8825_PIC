@@ -60,5 +60,6 @@ int main(void) {
     //axis_stepper_init(step,2);
     //axis_stepper_start_move(step,2000);
     //LATCbits.LATC4 = 1;
+    //__mul_i16__(0xFF, 0xFF);
     return task_run();
 }

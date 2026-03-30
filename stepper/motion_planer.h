@@ -14,8 +14,14 @@ typedef enum {
     G_DWELL
 } gcode_cmd_t;
 
+struct move_cmd {
+    gcode_cmd_t mode;
+    int16_t X, Y;
+    int16_t I, J;
+};
+
 enum motion_planer_signals{
-    EV_IDLE_SIG,
+    EV_IDLE_SIG = 0,
     EV_WORK_SIG,
     EV_DONE_SIG,
     EV_BUFFER_FILL_SIG

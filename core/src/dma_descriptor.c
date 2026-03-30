@@ -28,7 +28,7 @@ void dma_descriptor_enqueue(
 }
 
 void dma_descriptor_start(struct dma_descriptor_handle* handle){
-    //handle->fill   = handle->active->next;
+    handle->fill   = handle->active->next;
     dma_hw_arm(
         handle->dma,
         handle->trigger,
