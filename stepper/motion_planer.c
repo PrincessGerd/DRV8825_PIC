@@ -139,7 +139,7 @@ void arc_move_init(
         if (clockwise)
             theta = -theta;
         
-        int32_t steps = (abs(theta) + (MAX_DTHETA_Q15 << 1) - 1) >> MAX_DTHETA_SHIFT;
+        int32_t steps = (abs(theta) + (MAX_DTHETA_Q15) - 1) >> MAX_DTHETA_SHIFT;
         steps = max(1, steps);
         int16_t dtheta = (theta / steps);
 
