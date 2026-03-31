@@ -43,8 +43,7 @@ int32_t __mul_i16__(int16_t a, int16_t b){
   r2 = a_lo * b_hi;
   r3 = b_hi * a_hi;
 
-return 
-  ( (int32_t) (r3 << 24) |
+return  ( (int32_t) (r3 << 24) |
     (int32_t) (r2 << 16) |
     (int32_t) (r1 << 8)  |
     (int32_t) (r0));
@@ -54,8 +53,8 @@ int32_t mul_i32_q15(int32_t a, fp15_t b) {
     int16_t a_hi = a >> 16;
     uint16_t a_lo = a & 0xFFFF;
  
-    return ((int32_t)(a_hi * b) << 1) +
-           (((int32_t)(a_lo * b)) >> 15);
+    return (((int32_t)a_hi * b) << 1) +
+           (((int32_t)a_lo * b) >> 15);
 }
 
 fp15_t fpsqrt(fp15_t n){

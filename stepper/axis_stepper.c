@@ -1,7 +1,7 @@
 #include "axis_stepper.h"
 #include "motion_planer.h"
 #include "../core/hw/inc/dma_hw.h"
-#include "../core/hw/inc/timer2x_hw.h"
+#include "../core/hw/inc/timer1_hw.h"
 #include "../core/hw/inc/clcx_hw.h"
 #include "../core/gpio.h"
 #include "../core/interrupts.h"
@@ -11,15 +11,12 @@
 #include <xc.h>
 
 // (64Mhz/4/8) = 2 Mhz tick frequency
-static const timer_config_t tick_timer_cfg = {
-    .mode = TMR2MODE(TMR2_MODE_FREE_RUNNING,TMR2_FR_SW_GATE),
-    .clk_src = TMR2_CLK_FOSC4,
-    .reset_src = 0,
-    .polarity  = TMR2_RISING_EDGE,
-    .prescaler = TMR2_PRESCALER_64,
-    .postscaler = TMR2_POSTSCALER_1,
-    .clk_sync = true,
-    .prescaler_sync = true
+static const tmr1_config_t tick_timer_cfg = {
+    .clk_src = TMR1_CLK_FOSC4,
+    .prescaler = TMR1_PRESCALER_1,
+    .gate = {0},
+    .gate_enable = false,
+    .clk_sync = true
 };
 
 // Buffer stream must be in form [[u_step, u_dir, ...], [us,ud, vs,vd, ws,wd, es,ed]]
@@ -38,13 +35,13 @@ typedef struct axis_stepper {
 
 
 static axis_stepper_t    instance;
-static struct timer2x_hw* tick_timer;
+static struct timer1_hw* tick_timer;
 
 void axis_stepper_instance(axis_stepper_t** inst_out, task_t* const owner, uint8_t module_num){
     if (module_num >= 4 || inst_out == 0) return;
     if(owner == 0) return;
     dma_hw_create(module_num,&instance.dma);
-    create_timer2x(&tick_timer, 0);
+    timer1_create(&tick_timer);
     instance.owner = owner;
     *inst_out = &instance;
 }
@@ -58,8 +55,8 @@ void axis_stepper_init(
         self->port = port;
         self->port_mask = mask;
 
-        timer2x_init(tick_timer, &tick_timer_cfg);
-        timer2x_set_period(tick_timer, 0xFE); // int on reload. can varry timing later if needed
+        timer1_init(tick_timer, &tick_timer_cfg);
+        timer1_set_counter(tick_timer, 0xEFFF); // int on reload. can varry timing later if needed
         dma_hw_configure(
             self->dma,                  //
             DMA_MEM_SFR_GPR_SEL,        // use ram
@@ -71,7 +68,7 @@ void axis_stepper_init(
         dma_descriptor_setup(
             &self->dma_disp_handle,   // shared handle to descriptor linked-list
             self->dma,               // shared dma
-            0x20);                   // trigger irq set to TMR2
+            0x1E);                   // trigger irq set to TMR1
 
         //init and link buffers to descriptors
         for (int i = 0; i < NUM_DESCRIPTORS; i++) {
@@ -93,7 +90,7 @@ void axis_stepper_start_move(
         dma_descriptor_start(&self->dma_disp_handle);     // push first dma descriptor
         dma_descriptor_dispatch(&self->dma_disp_handle); // arm next 
         dma_hw_enable(self->dma);
-        timer2x_enable(tick_timer);
+        timer1_enable(tick_timer);
 }
 
 void axis_stepper_get_fill_buffer(struct axis_stepper* self, uint8_t **out){
@@ -112,7 +109,7 @@ void __interrupt(irq(0x4)) dma_axis1_isr(void){
         task_event_post(stepper->owner,&stepper->evt);
         stepper->steps_remaining -= AXIS_STEPPER_BUFFER_SIZE;
     }else{
-        timer2x_disable(tick_timer);
+        timer1_disable(tick_timer);
         stepper->evt.signal = EV_MOVE_DONE_SIG;  // inform motion planer of move done
         task_event_post(stepper->owner,&stepper->evt);
         *stepper->port &= ~stepper->port_mask;

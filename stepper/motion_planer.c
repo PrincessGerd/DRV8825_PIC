@@ -29,19 +29,26 @@ union stepper_port {
     };
     uint8_t mask;
 };
-#define DIR_MASK(port) ((uint8_t)(port.x_dir | port.y_dir))
-#define PORT_MASK(port) ((uint8_t)(port.x_step | port.y_step))
+#define DIR_MASK(port) ((uint8_t)(port->x_dir | port->y_dir))
+#define PORT_MASK(port) ((uint8_t)(port->x_step | port->y_step))
 
-
+struct line_state {
+    int16_t dx, dy;
+    int16_t countx, county;
+    int8_t sx, sy;
+    int16_t err;
+};
 
 struct move_state{
-    int32_t e1[2], e2[2];       // basis vectors
+    int16_t e1[2], e2[2];       // basis vectors
     int32_t c[2];               // center point
     int32_t steps_remaining;    //
     int32_t x;
     int32_t y; 
     int16_t dcos;               //
     int16_t dsin;               //
+    struct line_state line;
+    bool line_active;
     bool clockwise;             // rotation direction
 };
 
@@ -62,51 +69,53 @@ RING_BUFFER_DECLARE(move_queue,MOVEMENT_BUFER_SIZE,sizeof(struct move_cmd))
 static void stepper_init(task_t* const super, event_t const* const ie);
 static void stepper_dispatch(task_t* const super, event_t* const e);
 
-int gcode_line(
-    int16_t dx, int16_t dy, 
-    union stepper_port port,
-    uint8_t* out_buffer, int16_t offset)
+void gcode_line_init(int16_t dx, int16_t dy, struct line_state* ls){
+    ls->sx = (dx > 0) ? 1 : -1;
+    ls->sy = (dy > 0) ? 1 : -1;
+
+    ls->dx = (dx >= 0) ? dx : -dx;
+    ls->dy = (dy >= 0) ? dy : -dy;
+
+    ls->countx = 0;
+    ls->county = 0;
+
+    ls->err = dx - dy;
+}
+
+int gcode_line_move(
+    struct line_state* ls,
+    union stepper_port* port,
+    uint8_t* out_buffer, 
+    int16_t offset)
 {
-    int16_t sx = (dx >= 0) ? 1 : -1;
-    int16_t sy = (dy >= 0) ? 1 : -1;
-
-    dx = (dx >= 0) ? dx : -dx;
-    dy = (dy >= 0) ? dy : -dy;
-
-    int16_t countx = 0;
-    int16_t county = 0;
-
-    int16_t err = dx - dy;
     int16_t i = offset;
-
-    while (i < AXIS_STEPPER_BUFFER_SIZE) {
-        int16_t e2 = (err << 1);
+    while (i < AXIS_STEPPER_BUFFER_SIZE-2) {
+        if (ls->countx == ls->dx && ls->county == ls->dy)
+            break;
+            
+        int16_t e2 = (ls->err << 1);
         uint8_t point = 0;
 
-        if (countx == dx && county == dy)
-            break;
-
-        if (e2 > -dy) {
-            err -= dy;
-            countx++;
-            point |= port.x_step | (sx < 0 ? port.x_dir : 0);
+        if (e2 > -ls->dy) {
+            ls->err -= ls->dy;
+            ls->countx++;
+            point |= port->x_step | (ls->sx < 0 ? port->x_dir : 0);
         }
 
-        if (e2 < dx) {
-            err += dx;
-            county++;
-            point |= port.y_step | (sy < 0 ? port.y_dir : 0);
+        if (e2 < ls->dx) {
+            ls->err += ls->dx;
+            ls->county++;
+            point |= port->y_step | (ls->sy < 0 ? port->y_dir : 0);
         }
         // TODO: find a way to make sure the transistion between descriptors doesnt end on high
-        out_buffer[i] = point;
-        i++;
-        out_buffer[i] = point & DIR_MASK(port);
-        i++;
+        out_buffer[i++] = point;
+        out_buffer[i++] = (point & DIR_MASK(port));
     }
     return (i - offset);
 }
 
-#define MAX_DTHETA_Q15 (1 << 10)
+#define MAX_DTHETA_SHIFT 10
+#define MAX_DTHETA_Q15 (1 << MAX_DTHETA_SHIFT)
 void arc_move_init(
     int16_t u[2],
     int16_t X, int16_t Y,
@@ -127,11 +136,10 @@ void arc_move_init(
         int32_t cos_theta = (((int32_t)umc[0]*vmc[0] + (int32_t)umc[1]*vmc[1])); // dot
         int32_t theta; // total angle between start and end positions
         cordic_atan2(sin_theta, cos_theta, &theta);
-        
         if (clockwise)
             theta = -theta;
-            
-        int32_t steps = (abs(theta) + (MAX_DTHETA_Q15 << 1) - 1) >> MAX_DTHETA_Q15;
+        
+        int32_t steps = (abs(theta) + (MAX_DTHETA_Q15 << 1) - 1) >> MAX_DTHETA_SHIFT;
         steps = max(1, steps);
         int16_t dtheta = (theta / steps);
 
@@ -161,21 +169,37 @@ void arc_move_init(
         out_state->y = 0;
         out_state->c[0] = c[0];
         out_state->c[1] = c[1];
+        out_state->line_active = false;
     }
 
-void arc_move(struct move_state* ms, union stepper_port port, uint8_t* out_buffer){
+void arc_move(struct move_state* ms, union stepper_port* port, uint8_t* out_buffer){
     int N = (AXIS_STEPPER_BUFFER_SIZE < ms->steps_remaining) ? AXIS_STEPPER_BUFFER_SIZE : ms->steps_remaining;
     int16_t offset = 0;
     int16_t dx = 0, dy = 0;
-    for(int16_t i = 0; i < N; i++){
-        int32_t x_new = mul_i32_q15(ms->x,ms->dcos) - mul_i32_q15(ms->y,ms->dsin);
-        int32_t y_new = mul_i32_q15(ms->x,ms->dsin) + mul_i32_q15(ms->y,ms->dcos);
-        dx = (int16_t)((ms->c[0] + mul_i32_q15((x_new - ms->x), ms->e1[0]) + mul_i32_q15((y_new - ms->y),ms->e2[0])) >> Q15_BITS);
-        dy = (int16_t)((ms->c[1] + mul_i32_q15((x_new - ms->x), ms->e1[1]) + mul_i32_q15((y_new - ms->y),ms->e2[1])) >> Q15_BITS);
-        ms->x = x_new;
-        ms->y = y_new;
-        offset +=  gcode_line(dx,dy, port, out_buffer, offset);
-        ms->steps_remaining--;
+    while(offset < N-2){
+        if(!ms->line_active){
+            if(ms->steps_remaining == 0) {break;}
+            int32_t x_new = mul_i32_q15(ms->x,ms->dcos) - mul_i32_q15(ms->y,ms->dsin);
+            int32_t y_new = mul_i32_q15(ms->x,ms->dsin) + mul_i32_q15(ms->y,ms->dcos);
+            dx = (int16_t)((mul_i32_q15((x_new - ms->x), ms->e1[0]) + mul_i32_q15((y_new - ms->y),ms->e2[0])) >> Q15_BITS);
+            dy = (int16_t)((mul_i32_q15((x_new - ms->x), ms->e1[1]) + mul_i32_q15((y_new - ms->y),ms->e2[1])) >> Q15_BITS);
+            if((dx == 1 || dx == -1) && (dy == 1 || dy == -1)){
+                out_buffer[offset] |= port->x_step | (dx < 0 ? port->x_dir : 0);
+                out_buffer[offset] |= port->y_step | (dy < 0 ? port->x_dir : 0);
+                offset++;
+            }else{
+                gcode_line_init(dx,dy,&ms->line);
+                ms->line_active = true;
+            }
+            ms->x = x_new;
+            ms->y = y_new;
+            ms->steps_remaining--;
+        }
+        offset +=  gcode_line_move(&ms->line, port, out_buffer, offset);
+        if(ms->line.countx == ms->line.dx && ms->line.county == ms->line.dy){
+            //memset(&ms->line, 0, sizeof(struct line_state));
+            ms->line_active = false;
+        }
     }
 }
 
@@ -187,6 +211,7 @@ void stepper_create(task_t** self){
         (event_handler_t)&stepper_dispatch);
     static struct move_cmd tmp_mc = {0};
     mp_inst.curr_move = &tmp_mc;
+    memset(&mp_inst.ms, 0, sizeof(struct move_state));
     *self = &mp_inst.super;
 }
 
@@ -230,13 +255,11 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
             memset(fill, 0, AXIS_STEPPER_BUFFER_SIZE);
             switch (self->curr_move->mode) {
                 case G_ARC_CW:{
-                    arc_move(&self->ms, self->port, fill);
+                    arc_move(&self->ms, &self->port, fill);
                 } break;
                 case G_LINE:{
-                    int16_t dx = (self->curr_move->X - self->last_pos[0]);   // steps in y axis
-                    int16_t dy = (self->curr_move->Y - self->last_pos[1]);   // steps in x axis
-                    gcode_line(
-                        dx, dy, self->port, fill, 0);
+                    gcode_line_move(
+                        &self->ms.line, &self->port, fill, 0);
                 } break;         
                 case G_DWELL:
                     break; // not sure how to handle this yet. dont want to waste compute time
@@ -256,11 +279,10 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                 task_event_post(super,&self->evt);
                 return;
             }
-            self->curr_move = &next_move;
             uint8_t* fill;
             axis_stepper_get_fill_buffer(self->axes, &fill);
             memset(fill, 0, AXIS_STEPPER_BUFFER_SIZE);
-
+            self->curr_move = &next_move;
             int16_t steps = 0;
             switch (self->curr_move->mode) {
                 case G_ARC_CW:{
@@ -268,15 +290,15 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                         self->curr_move->X, self->curr_move->Y,
                         self->curr_move->I, self->curr_move->J,
                         self->curr_move->mode, &self->ms);
-                    arc_move(&self->ms, self->port, fill);
+                    arc_move(&self->ms, &self->port, fill);
                         steps = self->ms.steps_remaining;
                 } break;
                 case G_LINE:{
                     int16_t dx = self->curr_move->X - self->last_pos[0];   // steps in y axis
                     int16_t dy = self->curr_move->Y - self->last_pos[1];   // steps in x axis
                     steps = (dx < dy) ? abs(dy) : abs(dx);
-                    gcode_line(
-                        dx, dy, self->port, fill, 0);
+                    gcode_line_init(dx,dy,&self->ms.line);
+                    gcode_line_move(&self->ms.line, &self->port,fill,0);
                 } break;
                 case G_DWELL:
                     break; // not sure how to handle this yet. dont want to waste compute time
