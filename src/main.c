@@ -7,9 +7,9 @@
 #include <xc.h>
 
 int task_run(void) { // to prevent reset
-    system_init();
-    systick_config(10000, SYS_TICK_TIMER);
-    systick_config(2000000, FAST_TICK_TIMER);
+    //system_init();
+    //systick_config(10000, SYS_TICK_TIMER);
+    //systick_config(2000000, FAST_TICK_TIMER);
     while(1) {
         __nop();
     }
@@ -26,19 +26,23 @@ int main(void) {
     PIE0bits.DMA1SCNTIE = 1;                 // Enable source count done interrupt
     gpio_set_direction(RC_4, IO_DIR_OUTPUT);
     gpio_set_mode(RC_4, IO_MODE_DIGITAL);
-    gpio_set_direction(RC_3, IO_DIR_OUTPUT);
-    gpio_set_mode(RC_3, IO_MODE_DIGITAL);
-    INTCON0bits.GIE = 0; //Suspend interrupts
-    PPSLOCK = 0x55; //Required sequence
-    PPSLOCK = 0xAA; //Required sequence
-    PPSLOCKbits.PPSLOCKED = 0; //Set PPSLOCKED bit
-    INTCON0bits.GIE = 1; //Restore interrupts
-    RC4PPS = 0x07;
-    RC3PPS = 0x08;
-    INTCON0bits.GIE = 0; //Suspend interrupts
-    PPSLOCK = 0x55; //Required sequence
-    PPSLOCK = 0xAA; //Required sequence
-    PPSLOCKbits.PPSLOCKED = 1; //Set PPSLOCKED bit
+    gpio_set_direction(RC_5, IO_DIR_OUTPUT);
+    gpio_set_mode(RC_5, IO_MODE_DIGITAL);
+    gpio_set_direction(RC_1, IO_DIR_OUTPUT);
+    gpio_set_mode(RC_1, IO_MODE_DIGITAL);
+    gpio_set_direction(RC_0, IO_DIR_OUTPUT);
+    gpio_set_mode(RC_0, IO_MODE_DIGITAL);
+    //INTCON0bits.GIE = 0; //Suspend interrupts
+    //PPSLOCK = 0x55; //Required sequence
+    //PPSLOCK = 0xAA; //Required sequence
+    //PPSLOCKbits.PPSLOCKED = 0; //Set PPSLOCKED bit
+    //INTCON0bits.GIE = 1; //Restore interrupts
+    //RC4PPS = 0x07;
+    //RC3PPS = 0x08;
+    //INTCON0bits.GIE = 0; //Suspend interrupts
+    //PPSLOCK = 0x55; //Required sequence
+    //PPSLOCK = 0xAA; //Required sequence
+    //PPSLOCKbits.PPSLOCKED = 1; //Set PPSLOCKED bit
     INTCON0bits.GIE = 1; //Restore interrupts
     stepper_create(&AO_drv8825);
     static event_t* StpQueue[4];
@@ -59,5 +63,7 @@ int main(void) {
     //axis_stepper_instance(&step,0,0);
     //axis_stepper_init(step,2);
     //axis_stepper_start_move(step,2000);
+    //LATCbits.LATC4 = 1;
+    //__mul_i16__(0xFF, 0xFF);
     return task_run();
 }

@@ -20,23 +20,18 @@ static const int16_t cordic_atan[Q15_BITS+1] = {
   2,
   1};
 
-void cordic(fp15_t *x, fp15_t *y, fp15_t* z, cordic_mode_e mode){
-  fp15_t dx = *x;
-  fp15_t dy = *y;
-  fp15_t dz = *z;
+void cordic(int32_t *x, int32_t *y, int32_t* z, cordic_mode_e mode){
+  int32_t dx = *x;
+  int32_t dy = *y;
+  int32_t dz = *z;
+  int16_t d = 0;
   for (int i = 0; i < Q15_BITS+1; i++) {
-    int8_t d = mode == CORDIC_ROTATION ? (dz >= 0 ? 0 : -1) : (dy >= 0 ? 0 : -1);
-      fp15_t x_shr = dx >> i;
-      fp15_t y_shr = dy >> i;
-      if(d >= 0){
-        dx -= y_shr;
-        dy += x_shr;
-        dz -= cordic_atan[i];
-      }else {
-        dx += y_shr;
-        dy -= x_shr;
-        dz += cordic_atan[i];
-      }
+      d = mode == CORDIC_ROTATION ? (dz >= 0 ? 1 : -1) : (dy >= 0 ? -1 : 1);
+      int16_t x_shr = dx >> i;
+      int16_t y_shr = dy >> i;
+      dx -= d*y_shr;
+      dy += d*x_shr;
+      dz -= d*cordic_atan[i];
   }
   *x = dx;
   *y = dy;

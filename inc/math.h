@@ -17,7 +17,7 @@ fp15_t fp15_div(fp15_t a, fp15_t b);
 fp15_t fp15_mul(fp15_t a, fp15_t b);
 int32_t mul_i32_q15(int32_t a, fp15_t b);
 fp15_t fpsqrt(fp15_t n);
-
+int32_t __mul_i16__(int16_t a, int16_t b);
 ///////////////////////////////////////////////
 uint32_t isqrt32(uint32_t n);
 ///////////////////////////////////////////////
