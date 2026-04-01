@@ -69,7 +69,7 @@ RING_BUFFER_DECLARE(move_queue,MOVEMENT_BUFER_SIZE,sizeof(struct move_cmd))
 static void stepper_init(task_t* const super, event_t const* const ie);
 static void stepper_dispatch(task_t* const super, event_t* const e);
 
-void gcode_line_init(int16_t dx, int16_t dy, struct line_state* ls){
+void line_move_init(int16_t dx, int16_t dy, struct line_state* ls){
     ls->sx = (dx > 0) ? 1 : -1;
     ls->sy = (dy > 0) ? 1 : -1;
 
@@ -82,7 +82,7 @@ void gcode_line_init(int16_t dx, int16_t dy, struct line_state* ls){
     ls->err = dx - dy;
 }
 
-int gcode_line_move(
+int line_move(
     struct line_state* ls,
     union stepper_port* port,
     uint8_t* out_buffer, 
@@ -188,14 +188,14 @@ void arc_move(struct move_state* ms, union stepper_port* port, uint8_t* out_buff
                 out_buffer[offset] |= port->y_step | (dy < 0 ? port->x_dir : 0);
                 offset++;
             }else{
-                gcode_line_init(dx,dy,&ms->line);
+                line_move_init(dx,dy,&ms->line);
                 ms->line_active = true;
             }
             ms->x = x_new;
             ms->y = y_new;
             ms->steps_remaining--;
         }
-        offset +=  gcode_line_move(&ms->line, port, out_buffer, offset);
+        offset +=  line_move(&ms->line, port, out_buffer, offset);
         if(ms->line.countx == ms->line.dx && ms->line.county == ms->line.dy){
             //memset(&ms->line, 0, sizeof(struct line_state));
             ms->line_active = false;
@@ -258,7 +258,7 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                     arc_move(&self->ms, &self->port, fill);
                 } break;
                 case G_LINE:{
-                    gcode_line_move(
+                    line_move(
                         &self->ms.line, &self->port, fill, 0);
                 } break;         
                 case G_DWELL:
@@ -297,8 +297,8 @@ static void stepper_dispatch(task_t* const super, event_t* const e){
                     int16_t dx = self->curr_move->X - self->last_pos[0];   // steps in y axis
                     int16_t dy = self->curr_move->Y - self->last_pos[1];   // steps in x axis
                     steps = (dx < dy) ? abs(dy) : abs(dx);
-                    gcode_line_init(dx,dy,&self->ms.line);
-                    gcode_line_move(&self->ms.line, &self->port,fill,0);
+                    line_move_init(dx,dy,&self->ms.line);
+                    line_move(&self->ms.line, &self->port,fill,0);
                 } break;
                 case G_DWELL:
                     break; // not sure how to handle this yet. dont want to waste compute time
