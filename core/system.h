@@ -1,7 +1,7 @@
 #ifndef SYSTEM_H
 #define SYSTEM_H
 #include <stdint.h>
-
+#define _XTAL_FREQ  (64000000)
 #define SYSTEM_CLOCK_HZ (64000000/4)
 typedef enum {
     FAST_TICK_TIMER,

@@ -1,22 +1,23 @@
 #include "axis_stepper.h"
 #include "motion_planer.h"
 #include "../core/hw/inc/dma_hw.h"
-#include "../core/hw/inc/timer1_hw.h"
+#include "../core/hw/inc/pwm_hw.h"
 #include "../core/hw/inc/clcx_hw.h"
 #include "../core/gpio.h"
 #include "../core/interrupts.h"
 #include "../inc/math.h"
 #include "../core/task_manager.h"
 #include "../core/dma_descriptor.h"
+#include "../inc/ringbuffer.h"
 #include <xc.h>
 
 // (64Mhz/4/8) = 2 Mhz tick frequency
-static const tmr1_config_t tick_timer_cfg = {
-    .clk_src = TMR1_CLK_FOSC4,
-    .prescaler = TMR1_PRESCALER_1,
-    .gate = {0},
-    .gate_enable = false,
-    .clk_sync = true
+static const pwm_hw_config_t tick_timer_cfg = {
+    .clk_src = PWMx_CLK_FOSC,
+    .mode = PWMx_MODE_COMPARE_TOGGLE,
+    .autoload = true,
+    .out1_polarity_low = true,
+    .out2_polarity_low = true,
 };
 
 // Buffer stream must be in form [[u_step, u_dir, ...], [us,ud, vs,vd, ws,wd, es,ed]]
@@ -32,16 +33,19 @@ typedef struct axis_stepper {
     volatile uint8_t bufffer[NUM_DESCRIPTORS][AXIS_STEPPER_BUFFER_SIZE];   // equal number of buffers
     uint8_t axis_count;  // number of axes for this stepper
 } axis_stepper_t;
-
-
 static axis_stepper_t    instance;
-static struct timer1_hw* tick_timer;
+
+// workaround since i dont have access to NCO for acceleration
+RING_BUFFER_DECLARE(freq_sr, AXIS_STEPPER_BUFFER_SIZE, int16_t);
+static struct pwm_hw* tick_timer;
+static struct dma_hw* period_dma;
+
 
 void axis_stepper_instance(axis_stepper_t** inst_out, task_t* const owner, uint8_t module_num){
     if (module_num >= 4 || inst_out == 0) return;
     if(owner == 0) return;
     dma_hw_create(module_num,&instance.dma);
-    timer1_create(&tick_timer);
+    pwm_hw_create(&tick_timer);
     instance.owner = owner;
     *inst_out = &instance;
 }
@@ -55,8 +59,9 @@ void axis_stepper_init(
         self->port = port;
         self->port_mask = mask;
 
-        timer1_init(tick_timer, &tick_timer_cfg);
-        timer1_set_counter(tick_timer, 0xEFFF); // int on reload. can varry timing later if needed
+        pwm_hw_init(tick_timer, &tick_timer_cfg);
+        pwm_set_period_common(tick_timer, 0xEFFF); // int on reload.
+
         dma_hw_configure(
             self->dma,                  //
             DMA_MEM_SFR_GPR_SEL,        // use ram
@@ -68,7 +73,7 @@ void axis_stepper_init(
         dma_descriptor_setup(
             &self->dma_disp_handle,   // shared handle to descriptor linked-list
             self->dma,               // shared dma
-            0x1E);                   // trigger irq set to TMR1
+            0x26);                   // trigger irq set to pwm1
 
         //init and link buffers to descriptors
         for (int i = 0; i < NUM_DESCRIPTORS; i++) {
@@ -90,7 +95,7 @@ void axis_stepper_start_move(
         dma_descriptor_start(&self->dma_disp_handle);     // push first dma descriptor
         dma_descriptor_dispatch(&self->dma_disp_handle); // arm next 
         dma_hw_enable(self->dma);
-        timer1_enable(tick_timer);
+        pwm_hw_enable(tick_timer);
 }
 
 void axis_stepper_get_fill_buffer(struct axis_stepper* self, uint8_t **out){
@@ -98,7 +103,6 @@ void axis_stepper_get_fill_buffer(struct axis_stepper* self, uint8_t **out){
 }
 
 
-// TODO : FIX PROBLEM WITH TIMER1 TRIGGER for DMA
 void __interrupt(irq(0x4)) dma_axis1_isr(void){
     interrupt_clear(0x4);
     axis_stepper_t* stepper = &instance;
@@ -109,7 +113,7 @@ void __interrupt(irq(0x4)) dma_axis1_isr(void){
         task_event_post(stepper->owner,&stepper->evt);
         stepper->steps_remaining -= AXIS_STEPPER_BUFFER_SIZE;
     }else{
-        timer1_disable(tick_timer);
+        pwm_hw_disable(tick_timer);
         stepper->evt.signal = EV_MOVE_DONE_SIG;  // inform motion planer of move done
         task_event_post(stepper->owner,&stepper->evt);
         *stepper->port &= ~stepper->port_mask;

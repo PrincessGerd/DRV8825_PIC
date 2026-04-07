@@ -4,42 +4,29 @@
 #include <stdbool.h>
 #include "../core/task_manager.h"
 
-extern const struct stepper_initEvt* drv8825_workEvt;
-extern const struct stepper_initEvt* drv8825_initEvt;
+extern const struct motion_planer_initEvt* drv8825_workEvt;
+extern const struct motion_planer_initEvt* drv8825_initEvt;
 
-typedef enum {
-    G_ARC_CW = 0,
-    G_ARC_CCW,
-    G_LINE,
-    G_DWELL
-} gcode_cmd_t;
-
-struct move_cmd {
-    gcode_cmd_t mode;
-    int16_t X, Y;
-    int16_t I, J;
-};
 
 enum motion_planer_signals{
     EV_IDLE_SIG = 0,
     EV_WORK_SIG,
     EV_MOVE_DONE_SIG,
-    EV_BUFFER_FILL_SIG
 };
-typedef struct stepper_workEvt{
-    event_t     super;
-    gcode_cmd_t mode;
-    int16_t X, Y;
-    int16_t I, J;
-}stepper_workEvt_t;
 
-typedef struct stepper_initEvt{
+typedef struct motion_planer_workEvt{
+    event_t     super;
+    int16_t dx, dy, dz;
+    int16_t feed_rate;
+}motion_planer_workEvt_t;
+
+typedef struct motion_planer_initEvt{
     event_t   super;
     uint32_t  tick_frequency;
-}stepper_initEvt_t;
+}motion_planer_initEvt_t;
 
-struct stepper;
-static task_t* AO_drv8825;
+struct motion_planer;
+static task_t* AO_motion_planer;
 
 void stepper_create(task_t** self);
 

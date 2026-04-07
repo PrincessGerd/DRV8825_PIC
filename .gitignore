@@ -43,3 +43,7 @@
 /build/*
 /external/*
 /test_stuff/*
+/core/hw/inc/utmr.h
+/core/hw/src/utmr.c
+/core/hw/inc/clcx.h
+/core/hw/src/clcx.c
