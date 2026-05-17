@@ -1,9 +1,10 @@
-#include "../core/gpio.h"
-#include "../stepper/axis_stepper.h" 
-#include "../stepper/motion_planer.h"
-#include "../core/task_manager.h"
-#include "../core/system.h"
-#include "../core/interrupts.h"
+//#include "../core/gpio.h"
+//#include "../stepper/axis_stepper.h" 
+//#include "../stepper/motion_planer.h"
+//#include "../core/task_manager.h"
+//#include "../core/system.h"
+//#include "../core/interrupts.h"
+#include "../core/serial_logger.h"
 #include <xc.h>
 
 int task_run(void) { // to prevent reset
@@ -15,55 +16,38 @@ int task_run(void) { // to prevent reset
     }
 }
 
-extern task_t* AO_drv8825;
+//extern task_t* AO_drv8825;
 int main(void) {
-    //PWM1GIRbits.S1P1IF = 0;
-    //PWM1GIEbits.S1P1IE = 1;
-    //PWM2GIRbits.S1P1IF = 0;
-    //PWM2GIEbits.S1P1IE = 1;
-
-    PIR0bits.DMA1SCNTIF = 0;                 // Clear interrupt flag
-    PIE0bits.DMA1SCNTIE = 1;                 // Enable source count done interrupt
-    gpio_set_direction(RC_4, IO_DIR_OUTPUT);
-    gpio_set_mode(RC_4, IO_MODE_DIGITAL);
-    gpio_set_direction(RC_5, IO_DIR_OUTPUT);
-    gpio_set_mode(RC_5, IO_MODE_DIGITAL);
-    gpio_set_direction(RC_1, IO_DIR_OUTPUT);
-    gpio_set_mode(RC_1, IO_MODE_DIGITAL);
-    gpio_set_direction(RC_0, IO_DIR_OUTPUT);
-    gpio_set_mode(RC_0, IO_MODE_DIGITAL);
-    //INTCON0bits.GIE = 0; //Suspend interrupts
-    //PPSLOCK = 0x55; //Required sequence
-    //PPSLOCK = 0xAA; //Required sequence
-    //PPSLOCKbits.PPSLOCKED = 0; //Set PPSLOCKED bit
+    
+    //PIR0bits.DMA1SCNTIF = 0;                 // Clear interrupt flag
+    //PIE0bits.DMA1SCNTIE = 1;                 // Enable source count done interrupt
+    //gpio_set_direction(RC_4, IO_DIR_OUTPUT);
+    //gpio_set_mode(RC_4, IO_MODE_DIGITAL);
+    //gpio_set_direction(RC_5, IO_DIR_OUTPUT);
+    //gpio_set_mode(RC_5, IO_MODE_DIGITAL);
+    //gpio_set_direction(RC_1, IO_DIR_OUTPUT);
+    //gpio_set_mode(RC_1, IO_MODE_DIGITAL);
+    //gpio_set_direction(RC_0, IO_DIR_OUTPUT);
+    //gpio_set_mode(RC_0, IO_MODE_DIGITAL);
     //INTCON0bits.GIE = 1; //Restore interrupts
-    //RC4PPS = 0x07;
-    //RC3PPS = 0x08;
-    //INTCON0bits.GIE = 0; //Suspend interrupts
-    //PPSLOCK = 0x55; //Required sequence
-    //PPSLOCK = 0xAA; //Required sequence
-    //PPSLOCKbits.PPSLOCKED = 1; //Set PPSLOCKED bit
-    INTCON0bits.GIE = 1; //Restore interrupts
-    stepper_create(&AO_drv8825);
-    static event_t* StpQueue[4];
-    task_event_post(
-        AO_drv8825,
-        &drv8825_initEvt->super);
-    task_start(
-        AO_drv8825,
-        4u,
-        7,
-        StpQueue,
-        &(drv8825_initEvt->super));
-    AO_drv8825->dispatch(AO_drv8825,&drv8825_workEvt->super);
-    task_event_post(AO_drv8825, &drv8825_workEvt->super);
-    enable_global_interrupts();
-    task_event_consume(AO_drv8825);
-    //struct axis_stepper* step;
-    //axis_stepper_instance(&step,0,0);
-    //axis_stepper_init(step,2);
-    //axis_stepper_start_move(step,2000);
-    //LATCbits.LATC4 = 1;
-    //__mul_i16__(0xFF, 0xFF);
+//
+    //stepper_create(&AO_drv8825);
+    //static event_t* StpQueue[4];
+    //task_event_post(
+    //    AO_drv8825,
+    //    &drv8825_initEvt->super);
+    //task_start(
+    //    AO_drv8825,
+    //    4u,
+    //    7,
+    //    StpQueue,
+    //    &(drv8825_initEvt->super));
+    //AO_drv8825->dispatch(AO_drv8825,&drv8825_workEvt->super);
+    //task_event_post(AO_drv8825, &drv8825_workEvt->super);
+    //enable_global_interrupts();
+    //task_event_consume(AO_drv8825);
+    init_loggger();
+    SLOG_TRACE("message with some numbers %d %d" , 10, 20);
+    
     return task_run();
 }

@@ -35,7 +35,7 @@ struct segment{
 struct motion_planer{
     task_t super;
     event_t evt;
-    uint16_t target_speed
+    uint16_t target_speed;
     uint16_t initial_period;
     uint16_t max_period;
 
@@ -47,9 +47,9 @@ struct motion_planer{
 bool is_junction(struct segment* curr, struct segment* next, int16_t threshold){
     if(next == 0) return false;
     int32_t len = (curr->length * next->length);    // TODO: make this propper q15
-    int16_t inv_len = (FP_ONE /  len) >> Q15_BITS;
+    int16_t inv_len = (Q15_ONE /  len) >> Q15_BITS;
     int16_t dot = ((next->dx * curr->dx) + (next->dy * curr->dy) + (next->dz * curr->dz));
-    cos_theta = mul_i32_q15(dot, len);
+    int32_t cos_theta = mul_i32_q15(dot, len);
     return (cos_theta < threshold) ? true : false;
 }
 
@@ -135,7 +135,8 @@ static uint16_t next_period_deccel(struct motion_planer* self){
     return (uint16_t)period;
 }*/
 
-
+static void motion_planer_init(task_t* const super, event_t const* const ie);
+static void motion_planer_dispatch(task_t* const super, event_t* const e);
 
 void stepper_create(task_t** self){
     static struct motion_planer mp_inst = {0};
@@ -149,8 +150,6 @@ void stepper_create(task_t** self){
 static void motion_planer_init(task_t* const super, event_t const* const ie){
     struct motion_planer* self = container_of(super, struct motion_planer, super); 
     struct stepper_initEvt* initial_event = (struct stepper_initEvt*)ie;
-    axis_stepper_init(self->axes, self->axis_count, &LATC, port.mask);  
-    move_queue_init();  
 }
 
 static void motion_planer_dispatch(task_t* const super, event_t* const e){
@@ -160,8 +159,7 @@ static void motion_planer_dispatch(task_t* const super, event_t* const e){
         case EV_WORK_SIG:{
             struct motion_planer_workEvt* event = (struct motion_planer_workEvt*)e;
             // push the old prev out to motion controller
-
-            task_event_post(self->super, self->evt);
+            task_event_post(&self->super, &self->evt);
             // shift everything left
             self->prev = self->curr;
             self->curr = self->next;
@@ -173,6 +171,7 @@ static void motion_planer_dispatch(task_t* const super, event_t* const e){
                 (event->dx*event->dx) + 
                 (event->dy*event->dy) + 
                 (event->dz*event->dz));
+            apply_filter(self);
         } break;
         case EV_IDLE_SIG: {
             // do nothing. just defined for tracing

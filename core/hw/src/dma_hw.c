@@ -1,12 +1,12 @@
 #include "../inc/dma_hw.h"
-#include <xc.h>
+#include <xc.h> // TODO: replace with register definitions 
 
 struct dma_hw{
-    uint8_t module_num;
+    uint8_t module_num; // registers are hidden so the module num is all thet is needed
 };
+static struct dma_hw dma_instances[4]; 
 
-static struct dma_hw dma_instances[4];  
-void dma_hw_create(uint8_t module_num, const struct dma_hw ** dma_hw_inst_out) {
+void dma_hw_create(uint8_t module_num, struct dma_hw ** dma_hw_inst_out) {
     if (module_num >= 4 || dma_hw_inst_out == 0) return;
     dma_instances[module_num].module_num = module_num;
     *dma_hw_inst_out = &dma_instances[module_num];

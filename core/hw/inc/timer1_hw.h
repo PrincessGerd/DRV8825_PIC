@@ -69,6 +69,7 @@ typedef struct {
     }gate;
     bool gate_enable;
     bool clk_sync;
+    bool mode_16bit;
 } tmr1_config_t;
 
 

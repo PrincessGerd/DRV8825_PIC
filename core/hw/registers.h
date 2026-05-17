@@ -1,6 +1,7 @@
 #ifndef REGISTERS_H
 #define REGISTERS_H
 
+#define REG8(base, offset) ((volatile uint8_t*)(base + offset))
 #define SET_BIT(reg, shift)    ((*reg) |= (1U << (shift)))
 #define CLEAR_BIT(reg, shift)  ((*reg) &= ~(1U << (shift)))
 #define GET_BIT(reg, shift)    (((*(reg) >> (shift)) & 1U))
@@ -414,4 +415,223 @@
 #define PWM_CFG_POL2_MASK      BIT(PWM_CFG_POL2_SHIFT)
 #define PWM_CFG_PPEN_MASK      BIT(PWM_CFG_PPEN_SHIFT)
 #define PWM_CFG_MODE_MASK      FIELD(3,PWM_CFG_MODE_SHIFT)
+
+/* ============================================================
+ * I2C REGISTER DEFINITIONS
+ * ============================================================ */
+
+#define I2C1_BASE_ADDR             0x01E4u
+
+/* ============================================================
+ * Register Offsets
+ * ============================================================ */
+
+#define I2C_STAT0_OFFSET           0x00u
+#define I2C_STAT1_OFFSET           0x01u
+#define I2C_CON0_OFFSET            0x02u
+#define I2C_CON1_OFFSET            0x03u
+#define I2C_CON2_OFFSET            0x04u
+#define I2C_CON3_OFFSET            0x05u
+#define I2C_PIR_OFFSET             0x06u
+#define I2C_PIE_OFFSET             0x07u
+#define I2C_ERR_OFFSET             0x08u
+#define I2C_CNTL_OFFSET            0x09u
+#define I2C_CNTH_OFFSET            0x0Au
+#define I2C_RXB_OFFSET             0x0Bu
+#define I2C_TXB_OFFSET             0x0Cu
+#define I2C_ADB0_OFFSET            0x0Du
+#define I2C_ADB1_OFFSET            0x0Eu
+#define I2C_ADR0_OFFSET            0x0Fu
+#define I2C_ADR1_OFFSET            0x10u
+#define I2C_ADR2_OFFSET            0x11u
+#define I2C_ADR3_OFFSET            0x12u
+#define I2C_BTO_OFFSET             0x13u
+#define I2C_BAUD_OFFSET            0x14u
+#define I2C_CLK_OFFSET             0x15u
+#define I2C_BTOC_OFFSET            0x16u
+
+/* ============================================================
+ * I2C1STAT0
+ * ============================================================ */
+
+#define I2C_STAT0_D_SHIFT          3u
+#define I2C_STAT0_R_SHIFT          4u
+#define I2C_STAT0_MMA_SHIFT        5u
+#define I2C_STAT0_SMA_SHIFT        6u
+#define I2C_STAT0_BFRE_SHIFT       7u
+
+#define I2C_STAT0_D_MASK           BIT(I2C_STAT0_D_SHIFT)
+#define I2C_STAT0_R_MASK           BIT(I2C_STAT0_R_SHIFT)
+#define I2C_STAT0_MMA_MASK         BIT(I2C_STAT0_MMA_SHIFT)
+#define I2C_STAT0_SMA_MASK         BIT(I2C_STAT0_SMA_SHIFT)
+#define I2C_STAT0_BFRE_MASK        BIT(I2C_STAT0_BFRE_SHIFT)
+
+/* ============================================================
+ * I2C1STAT1
+ * ============================================================ */
+
+#define I2C_STAT1_CLRBF_SHIFT      3u
+#define I2C_STAT1_RXBF_SHIFT       4u
+#define I2C_STAT1_RXRE_SHIFT       5u
+#define I2C_STAT1_TXBE_SHIFT       6u
+#define I2C_STAT1_TXWE_SHIFT       7u
+
+#define I2C_STAT1_CLRBF_MASK       BIT(I2C_STAT1_CLRBF_SHIFT)
+#define I2C_STAT1_RXBF_MASK        BIT(I2C_STAT1_RXBF_SHIFT)
+#define I2C_STAT1_RXRE_MASK        BIT(I2C_STAT1_RXRE_SHIFT)
+#define I2C_STAT1_TXBE_MASK        BIT(I2C_STAT1_TXBE_SHIFT)
+#define I2C_STAT1_TXWE_MASK        BIT(I2C_STAT1_TXWE_SHIFT)
+
+/* ============================================================
+ * I2C1CON0
+ * ============================================================ */
+
+#define I2C_CON0_MODE_SHIFT        0u
+#define I2C_CON0_MDR_SHIFT         3u
+#define I2C_CON0_CSTR_SHIFT        4u
+#define I2C_CON0_S_SHIFT           5u
+#define I2C_CON0_RSEN_SHIFT        6u
+#define I2C_CON0_EN_SHIFT          7u
+
+#define I2C_CON0_MODE_MASK         FIELD(3u, I2C_CON0_MODE_SHIFT)
+#define I2C_CON0_MDR_MASK          BIT(I2C_CON0_MDR_SHIFT)
+#define I2C_CON0_CSTR_MASK         BIT(I2C_CON0_CSTR_SHIFT)
+#define I2C_CON0_S_MASK            BIT(I2C_CON0_S_SHIFT)
+#define I2C_CON0_RSEN_MASK         BIT(I2C_CON0_RSEN_SHIFT)
+#define I2C_CON0_EN_MASK           BIT(I2C_CON0_EN_SHIFT)
+
+/* ============================================================
+ * I2C1CON1
+ * ============================================================ */
+
+#define I2C_CON1_CSD_SHIFT         0u
+#define I2C_CON1_TXU_SHIFT         1u
+#define I2C_CON1_RXO_SHIFT         2u
+#define I2C_CON1_P_SHIFT           3u
+#define I2C_CON1_ACKT_SHIFT        4u
+#define I2C_CON1_ACKSTAT_SHIFT     5u
+#define I2C_CON1_ACKDT_SHIFT       6u
+#define I2C_CON1_ACKCNT_SHIFT      7u
+
+#define I2C_CON1_CSD_MASK          BIT(I2C_CON1_CSD_SHIFT)
+#define I2C_CON1_TXU_MASK          BIT(I2C_CON1_TXU_SHIFT)
+#define I2C_CON1_RXO_MASK          BIT(I2C_CON1_RXO_SHIFT)
+#define I2C_CON1_P_MASK            BIT(I2C_CON1_P_SHIFT)
+#define I2C_CON1_ACKT_MASK         BIT(I2C_CON1_ACKT_SHIFT)
+#define I2C_CON1_ACKSTAT_MASK      BIT(I2C_CON1_ACKSTAT_SHIFT)
+#define I2C_CON1_ACKDT_MASK        BIT(I2C_CON1_ACKDT_SHIFT)
+#define I2C_CON1_ACKCNT_MASK       BIT(I2C_CON1_ACKCNT_SHIFT)
+
+/* ============================================================
+ * I2C1CON2
+ * ============================================================ */
+
+#define I2C_CON2_BFRET_SHIFT       0u
+#define I2C_CON2_SDAHT_SHIFT       2u
+#define I2C_CON2_ABD_SHIFT         4u
+#define I2C_CON2_GCEN_SHIFT        5u
+#define I2C_CON2_ACNT_SHIFT        7u
+
+#define I2C_CON2_BFRET_MASK        FIELD(2u, I2C_CON2_BFRET_SHIFT)
+#define I2C_CON2_SDAHT_MASK        FIELD(2u, I2C_CON2_SDAHT_SHIFT)
+#define I2C_CON2_ABD_MASK          BIT(I2C_CON2_ABD_SHIFT)
+#define I2C_CON2_GCEN_MASK         BIT(I2C_CON2_GCEN_SHIFT)
+#define I2C_CON2_ACNT_MASK         BIT(I2C_CON2_ACNT_SHIFT)
+
+/* ============================================================
+ * I2C1CON3
+ * ============================================================ */
+
+#define I2C_CON3_ACNTMD_SHIFT      0u
+#define I2C_CON3_FME_SHIFT         2u
+#define I2C_CON3_BFREDR_SHIFT      7u
+
+#define I2C_CON3_ACNTMD_MASK       FIELD(2u, I2C_CON3_ACNTMD_SHIFT)
+#define I2C_CON3_FME_MASK          FIELD(2u, I2C_CON3_FME_SHIFT)
+#define I2C_CON3_BFREDR_MASK       BIT(I2C_CON3_BFREDR_SHIFT)
+
+/* ============================================================
+ * I2C1PIR
+ * ============================================================ */
+
+#define I2C_PIR_SCIF_SHIFT         0u
+#define I2C_PIR_RSCIF_SHIFT        1u
+#define I2C_PIR_PCIF_SHIFT         2u
+#define I2C_PIR_ADRIF_SHIFT        3u
+#define I2C_PIR_WRIF_SHIFT         4u
+#define I2C_PIR_ACKTIF_SHIFT       5u
+#define I2C_PIR_CNTIF_SHIFT        6u
+
+#define I2C_PIR_SCIF_MASK          BIT(I2C_PIR_SCIF_SHIFT)
+#define I2C_PIR_RSCIF_MASK         BIT(I2C_PIR_RSCIF_SHIFT)
+#define I2C_PIR_PCIF_MASK          BIT(I2C_PIR_PCIF_SHIFT)
+#define I2C_PIR_ADRIF_MASK         BIT(I2C_PIR_ADRIF_SHIFT)
+#define I2C_PIR_WRIF_MASK          BIT(I2C_PIR_WRIF_SHIFT)
+#define I2C_PIR_ACKTIF_MASK        BIT(I2C_PIR_ACKTIF_SHIFT)
+#define I2C_PIR_CNTIF_MASK         BIT(I2C_PIR_CNTIF_SHIFT)
+
+/* ============================================================
+ * I2C1PIE
+ * ============================================================ */
+
+#define I2C_PIE_SCIE_SHIFT         0u
+#define I2C_PIE_RSCIE_SHIFT        1u
+#define I2C_PIE_PCIE_SHIFT         2u
+#define I2C_PIE_ADRIE_SHIFT        3u
+#define I2C_PIE_WRIE_SHIFT         4u
+#define I2C_PIE_ACKTIE_SHIFT       5u
+#define I2C_PIE_CNTIE_SHIFT        6u
+
+#define I2C_PIE_SCIE_MASK          BIT(I2C_PIE_SCIE_SHIFT)
+#define I2C_PIE_RSCIE_MASK         BIT(I2C_PIE_RSCIE_SHIFT)
+#define I2C_PIE_PCIE_MASK          BIT(I2C_PIE_PCIE_SHIFT)
+#define I2C_PIE_ADRIE_MASK         BIT(I2C_PIE_ADRIE_SHIFT)
+#define I2C_PIE_WRIE_MASK          BIT(I2C_PIE_WRIE_SHIFT)
+#define I2C_PIE_ACKTIE_MASK        BIT(I2C_PIE_ACKTIE_SHIFT)
+#define I2C_PIE_CNTIE_MASK         BIT(I2C_PIE_CNTIE_SHIFT)
+
+/* ============================================================
+ * I2C1ERR
+ * ============================================================ */
+
+#define I2C_ERR_NACKIE_SHIFT       0u
+#define I2C_ERR_BCLIE_SHIFT        1u
+#define I2C_ERR_BTOIE_SHIFT        2u
+#define I2C_ERR_NACKIF_SHIFT       4u
+#define I2C_ERR_BCLIF_SHIFT        5u
+#define I2C_ERR_BTOIF_SHIFT        6u
+
+#define I2C_ERR_NACKIE_MASK        BIT(I2C_ERR_NACKIE_SHIFT)
+#define I2C_ERR_BCLIE_MASK         BIT(I2C_ERR_BCLIE_SHIFT)
+#define I2C_ERR_BTOIE_MASK         BIT(I2C_ERR_BTOIE_SHIFT)
+#define I2C_ERR_NACKIF_MASK        BIT(I2C_ERR_NACKIF_SHIFT)
+#define I2C_ERR_BCLIF_MASK         BIT(I2C_ERR_BCLIF_SHIFT)
+#define I2C_ERR_BTOIF_MASK         BIT(I2C_ERR_BTOIF_SHIFT)
+
+/* ============================================================
+ * I2C1BTO
+ * ============================================================ */
+
+#define I2C_BTO_TOTIME_SHIFT       0u
+#define I2C_BTO_TOBY32_SHIFT       6u
+#define I2C_BTO_TOREC_SHIFT        7u
+
+#define I2C_BTO_TOTIME_MASK        FIELD(6u, I2C_BTO_TOTIME_SHIFT)
+#define I2C_BTO_TOBY32_MASK        BIT(I2C_BTO_TOBY32_SHIFT)
+#define I2C_BTO_TOREC_MASK         BIT(I2C_BTO_TOREC_SHIFT)
+
+/* ============================================================
+ * I2C1BAUD
+ * ============================================================ */
+
+#define I2C_BAUD_BAUD_SHIFT        0u
+#define I2C_BAUD_BAUD_MASK         FIELD(8u, I2C_BAUD_BAUD_SHIFT)
+
+/* ============================================================
+ * I2C1CLK
+ * ============================================================ */
+
+#define I2C_CLK_CLK_SHIFT          0u
+#define I2C_CLK_CLK_MASK           FIELD(5u, I2C_CLK_CLK_SHIFT)
+
 #endif // REGISTERS_H

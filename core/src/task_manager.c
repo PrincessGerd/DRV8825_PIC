@@ -3,7 +3,6 @@
 #include "../interrupts.h"
 #include <stdint.h>
 #include "../core/gpio.h"
-#include <xc.h>
 
 static volatile uint8_t lock_count = 0;
 
@@ -50,8 +49,6 @@ void task_start(
         self->count = 0;
         self->prio = prio;
         self->init(self,ie);
-        //interrupt_set_priority(self->irq_num, self->prio == TM_HIGH_PRIORITY);
-        //interrupt_enable(self->irq_num);
 }
 
 void task_event_post(task_t* self, struct event* event){

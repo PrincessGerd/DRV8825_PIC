@@ -9,7 +9,6 @@
 #include "../core/task_manager.h"
 #include "../core/dma_descriptor.h"
 #include "../inc/ringbuffer.h"
-#include <xc.h>
 
 // (64Mhz/4/8) = 2 Mhz tick frequency
 static const pwm_hw_config_t tick_timer_cfg = {
@@ -45,7 +44,7 @@ void axis_stepper_instance(axis_stepper_t** inst_out, task_t* const owner, uint8
     if (module_num >= 4 || inst_out == 0) return;
     if(owner == 0) return;
     dma_hw_create(module_num,&instance.dma);
-    pwm_hw_create(&tick_timer);
+    pwm_hw_create(0, &tick_timer);
     instance.owner = owner;
     *inst_out = &instance;
 }

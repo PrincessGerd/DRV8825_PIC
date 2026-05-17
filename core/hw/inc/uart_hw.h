@@ -42,22 +42,18 @@ typedef struct{
 }uart_hw_config_t;
 
 struct uart_hw;
-void create_uart_hw(struct uart_hw const **uart_hw_inst_out);
-void uart_hw_init(struct uart_hw *self,const uart_hw_config_t* config);
-void uart_hw_set_baud(struct uart_hw *self, uint16_t baud);
+void uart_hw_init(const uart_hw_config_t* config);
+void uart_hw_set_baud(uint16_t baud);
 
-void uart_hw_enable(struct uart_hw const *self);
-void uart_hw_TX_enable(struct uart_hw const *self);
-void uart_hw_RX_enable(struct uart_hw const *self);
+void uart_hw_enable(void);
+void uart_hw_TX_enable(void);
+void uart_hw_RX_enable(void);
 
-void uart_hw_disable(struct uart_hw const *self);
-void uart_hw_TX_disable(struct uart_hw const *self);
-void uart_hw_RX_disable(struct uart_hw const *self);
+void uart_hw_disable(void);
+void uart_hw_TX_disable(void);
+void uart_hw_RX_disable(void);
 
-
-extern void uart_hw_write_byte(struct uart_hw const *self, uint8_t byte);
-extern void uart_hw_read_byte(struct uart_hw const *self, uint8_t *byte);
-void uart_hw_write(struct uart_hw const *self, uint8_t *bytes, uint16_t tx_len, uint16_t* bytes_writen);
-void uart_hw_read(struct uart_hw const *self, uint8_t *bytes, uint16_t* bytes_recived);
-
+void uart_hw_write(uint8_t *bytes, unsigned int len);
+void uart_hw_read(uint8_t* byte);
+void uart_hw_write_polling(uint8_t *bytes, uint8_t tx_len, uint8_t* bytes_writen);
 #endif

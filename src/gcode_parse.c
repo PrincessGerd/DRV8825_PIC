@@ -2,6 +2,7 @@
 #include "../inc/math.h"
 #include "../core/task_manager.h"
 #include <string.h>
+#include <stdlib.h>
 
 typedef enum{
     TOKEN_INTEGER = 0b01,
@@ -57,19 +58,20 @@ TokenType_e get_number_type(const char* c, uint8_t* num_len_o, uint8_t* len_to_d
                 ? (uint8_t)(ptr - (c+1))
                 : (uint8_t)(ptr - c);
         }
+        *len_to_dot_o++;
     }
-    num_len_o = is_negative 
+    *num_len_o = is_negative 
         ? (uint8_t)(ptr - (c+1))
         : (uint8_t)(ptr - c);
     return token;
 }
 
 
-static Token_t next_code(char* line, uint8_t* count, uint16_t* val_o, char* letter_o){
+static bool next_code(char* line, uint8_t* count, uint16_t* val_o, char* letter_o){
     if(line[*count] == '\0'){
         return false; // done
     }
-    if(!is_letter_AZ(line[*count])){
+    if(!is_letter_AZ(&line[*count])){
         return false; // error, expected letter
     }
     *letter_o = line[*count];
@@ -107,7 +109,7 @@ void parse_line(char* line){
     int16_t curr_val = 0;
     char curr_code;
     uint8_t modal_group = 0;
-    while(next_code(line, count, &curr_val, &curr_code)){
+    while(next_code(line, &count, &curr_val, &curr_code)){
         switch (curr_code) {
             case 'G':{
                 switch(curr_val){

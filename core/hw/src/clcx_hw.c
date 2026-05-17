@@ -3,7 +3,7 @@
 #include "../registers.h"
 
 typedef struct clcx_hw{
-    uint8_t module_num;
+    uint8_t module_num; // registers are hidden so the module num is all thet is needed
 } clcx_hw_t;
 
 #define CLCSEL  (volatile uint8_t*)(CLC_BASE_ADDRESS + CLC_SELECT_OFFSET)

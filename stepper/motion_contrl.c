@@ -2,14 +2,15 @@
 #include "../core/task_manager.h"
 #include "../core/types.h"
 #include "../core/gpio.h"
+#include "../core/serial_logger.h"
 #include "../inc/math.h"
 #include "../inc/cordic.h"
 #include "../inc/ringbuffer.h"
 #include "axis_stepper.h"
 #include <stdint.h>
 #include <stdbool.h>
-#include <xc.h>
-
+#include <string.h>
+#include <stdlib.h>
 
 #define MOVEMENT_BUFER_SIZE 32
 union stepper_port {
@@ -58,8 +59,8 @@ struct motion_control{
 
 RING_BUFFER_DECLARE(move_queue, MOVEMENT_BUFER_SIZE, move_cmd_t);
 
-static void stepper_init(task_t* const super, event_t const* const ie);
-static void stepper_dispatch(task_t* const super, event_t* const e);
+static void motion_control_init(task_t* const super, event_t const* const ie);
+static void motion_control_dispatch(task_t* const super, event_t* const e);
 
 void line_move_init(int16_t dx, int16_t dy, struct line_state* ls){
     ls->sx = (dx > 0) ? 1 : -1;
@@ -204,8 +205,8 @@ void motion_control_create(task_t** self){
     static struct motion_control mc_inst = {0};
     axis_stepper_instance(&mc_inst.axes, &mc_inst.super,0);
     task_create(&mc_inst.super,
-        (event_handler_t)&stepper_init,
-        (event_handler_t)&stepper_dispatch);
+        (event_handler_t)&motion_control_init,
+        (event_handler_t)&motion_control_dispatch);
     static struct move_cmd tmp_mc = {0};
     mc_inst.curr_move = &tmp_mc;
     memset(&mc_inst.ms, 0, sizeof(struct move_state));
@@ -224,6 +225,7 @@ static void motion_control_init(task_t* const super, event_t const* const ie){
         .y_dir  = (1 << 0)
     };
     self->port = port;
+    uint8_t* LATC = (volatile uint8_t*)0x0495;
     axis_stepper_init(self->axes, self->axis_count, &LATC, port.mask);  
     move_queue_init();  
 }
@@ -241,6 +243,7 @@ static void motion_control_dispatch(task_t* const super, event_t* const e){
                 self->evt.signal = EV_MOVE_DONE_SIG;   
                 task_event_post(super,&self->evt);
             }  
+
         } break;
         ////////////////////////////////////////////////////////
         case EV_BUFFER_FILL_SIG:{
@@ -267,7 +270,8 @@ static void motion_control_dispatch(task_t* const super, event_t* const e){
         ////////////////////////////////////////////////////////
         case EV_MOVE_DONE_SIG:{
             struct move_cmd next_move;
-            bool bdone = ring_buffer_dequeue(move_queue, (uint8_t*)(&next_move));  
+            ring_buffer_dequeue(move_queue, (uint8_t*)(&next_move));  
+            bool bdone = ring_buffer_is_empty(move_queue);
             if(bdone == false){
                 self->evt.signal = EV_IDLE_SIG;   
                 task_event_post(super,&self->evt);
@@ -284,6 +288,7 @@ static void motion_control_dispatch(task_t* const super, event_t* const e){
                         self->curr_move->X, self->curr_move->Y,
                         self->curr_move->I, self->curr_move->J,
                         self->curr_move->mode, &self->ms);
+                    SLOG_TRACE("arc move init: X %d, Y %d, I %d, J %d", self->curr_move->X, self->curr_move->Y, self->curr_move->I, self->curr_move->J);
                     arc_move(&self->ms, &self->port, fill);
                         steps = self->ms.steps_remaining;
                 } break;
@@ -307,6 +312,7 @@ static void motion_control_dispatch(task_t* const super, event_t* const e){
         }break;
         ////////////////////////////////////////////////////////
         case EV_IDLE_SIG: {
+            SLOG_TRACE("motion controll IDLE", 0);
             // do nothing. just defined for tracing
         }break;
     default:

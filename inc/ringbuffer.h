@@ -5,12 +5,14 @@
 #include <stdbool.h>
 
 #define MAX_BUFFER_LEN 256
+
 #define PTR_ADD(p,val)  ((void*)(p) + (val))
 #define PTR_SUB(p,val)  ((void*)(p) - (val))
 #define mod(a,b) (a & (b-1u))
 #define RB_INDEX(rb, i) (mod(i, (rb)->capacity))
 
 #define STATIC_ASSERT(cond, msg) _Static_assert(cond, msg)
+#define CALC_RB_MEM_SIZE(cap, elem_size) ((cap * elem_size) + sizeof(rb_state_t)) 
 
 typedef struct {
     uint16_t capacity;
@@ -33,31 +35,15 @@ typedef struct {
         name->data = PTR_ADD(name, sizeof(rb_state_t)); \
     }
 
+inline bool ring_buffer_is_full(const rb_state_t* buffer);
+inline bool ring_buffer_is_empty(const rb_state_t* buffer);
+void ring_buffer_create(rb_state_t* rb, void* memory, unsigned int size, unsigned int elem_size);
+void ring_buffer_enqueue(rb_state_t* rb, const void* item);
+void ring_buffer_dequeue(rb_state_t* rb, void* out_item);
+void ring_buffer_peek_tail(const rb_state_t* rb, void* data);
 
-static inline bool ring_buffer_is_full(const rb_state_t* buffer);
-static inline bool ring_buffer_is_empty(const rb_state_t* buffer);
-bool ring_buffer_enqueue(rb_state_t* rb, const void* item);
-bool ring_buffer_dequeue(rb_state_t* rb, void* out_item);
-
-/*
-    RING_BUFFER_DECLARE(midi, 48, uint32_t);
-
-    int main() {
-        midi_buffer_init();
-        for(int i=0; i < 48; i++){
-            ring_buffer_enqueue(midi_buffer, &i);
-        }
-
-        uint32_t data_out;
-        for(int i=0; i < 48; i++){
-            ring_buffer_dequeue(midi_buffer, &data_out);
-            printf("%u\n", data_out);
-        }
-        ring_buffer_dequeue(midi_buffer, &data_out);
-
-        return 0;
-    }
-
-*/
-
+// needed for fast transfer of strings 
+void ring_buffer_enqueue_chunk(rb_state_t* rb, const void* items, unsigned int len);
+void ring_buffer_dequeue_chunk(rb_state_t* rb, const void* out_items, unsigned int len);
+//void ring_buffer_peek_head(const rb_state_t* rb, void* data); unused
 #endif

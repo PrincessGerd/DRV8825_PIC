@@ -1,6 +1,10 @@
 #ifndef MOTION_CONTROL_H
 #define MOTION_CONTROL_H
 
+#include <stdbool.h>
+#include <stdint.h>
+#include "../core/task_manager.h"
+
 extern const struct motion_control_workEvt* drv8825_workEvt;
 extern const struct motion_control_initEvt* drv8825_initEvt;
 

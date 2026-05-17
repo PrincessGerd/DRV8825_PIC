@@ -9,6 +9,23 @@ typedef int16_t fp15_t;
 #define HALF_PI Q15_ONE/4
 #define PI      Q15_ONE/2
 
+
+//extern uint32_t __mul_u16__(uint16_t a, uint16_t b);
+//extern int32_t __mul_i16__(int16_t a, int16_t b);
+
+uint32_t __umul32__(uint32_t x, uint32_t y) {
+    uint16_t xH = (uint16_t)(x >> 16);
+    uint16_t xL = (uint16_t)(x & 0xFFFF);
+    uint16_t yH = (uint16_t)(y >> 16);
+    uint16_t yL = (uint16_t)(y & 0xFFFF);
+
+    uint32_t result = (uint32_t)xL * yL;
+    result += ((uint32_t)xL * yH) << 16;
+    result += ((uint32_t)xH * yL) << 16;
+
+    return result;
+}
+
 uint32_t isqrt32(uint32_t n) {
     uint32_t x = n;
     uint32_t y = (x + 1) >> 1;
